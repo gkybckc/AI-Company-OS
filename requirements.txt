@@ -1,0 +1,4 @@
+pydantic
+rich
+typer
+python-dotenv
