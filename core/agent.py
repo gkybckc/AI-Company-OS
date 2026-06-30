@@ -17,6 +17,12 @@ class Agent:
     def receive_message(self, message: str):
         self.inbox.append(message)
 
+    def read_messages(self):
+        return self.inbox
+
+    def clear_messages(self):
+        self.inbox.clear()
+
     def finish_task(self):
         self.current_task = ""
         self.status = "Idle"

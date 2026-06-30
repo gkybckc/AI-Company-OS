@@ -14,3 +14,6 @@ class Company:
             print(
                 f"{agent.name} | {agent.role} | {agent.status}"
             )
+
+    def get_agents(self):
+        return self.agents

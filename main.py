@@ -32,6 +32,8 @@ bus.publish(
     )
 )
 
+bus.dispatch(company.get_agents())
+
 company.list_agents()
 
 print("\nEvent History\n")
@@ -40,3 +42,13 @@ for event in bus.history():
     print(
         f"{event.sender} -> {event.receiver} : {event.message}"
     )
+print("\nInbox\n")
+
+for agent in company.get_agents():
+
+    if agent.read_messages():
+
+        print(agent.name)
+
+        for message in agent.read_messages():
+            print(" -", message)
