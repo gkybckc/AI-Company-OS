@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Event Stream{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Event Stream</h1>
+  <p class="page-subtitle">Live event timeline &mdash; auto-refreshes every 5 seconds</p>
+</div>
+
+<!-- Channel Stats -->
+<div class="card">
+  <div class="card-header">
+    <h2>Channel Statistics</h2>
+  </div>
+  <div class="card-body">
+    <div class="channel-stats">
+      {% for channel, count in ev_stats.events_by_channel.items() %}
+      <div class="channel-stat-item">
+        <span class="event-channel event-channel-{{ channel | lower }}">{{ channel }}</span>
+        <span class="channel-count">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="field-row" style="margin-top: 1rem;">
+      <span class="field-label">Total Events:</span>
+      <span class="field-value">{{ ev_stats.total_events }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Active Subscribers:</span>
+      <span class="field-value">{{ ev_stats.active_subscribers | join(', ') if ev_stats.active_subscribers else 'None' }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Live Event Feed -->
+<div class="card">
+  <div class="card-header">
+    <h2>Event Timeline</h2>
+    <span class="poll-indicator" id="events-poll-status">auto-refresh: 5s</span>
+  </div>
+  <div
+    id="live-event-feed"
+    hx-get="/api/events/recent?limit=30"
+    hx-trigger="load, every 5s"
+    hx-swap="innerHTML"
+    class="card-body event-feed"
+  >
+    {% for ev in events %}
+    <div class="event-row">
+      <span class="event-ts">{{ ev.timestamp.strftime('%H:%M:%S') }}</span>
+      <span class="event-channel event-channel-{{ ev.category.value | lower }}">{{ ev.category.value }}</span>
+      <span class="event-source">{{ ev.source }}</span>
+      <span class="event-action">{{ ev.get_payload_value('action', '') }}</span>
+      {% if ev.payload %}
+      <span class="event-payload">
+        {% for k, v in ev.payload.items() %}
+          {% if k != 'action' %}
+            <span class="payload-kv">{{ k }}: {{ v }}</span>
+          {% endif %}
+        {% endfor %}
+      </span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

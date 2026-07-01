@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Projects{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Projects</h1>
+  <p class="page-subtitle">{{ total_projects }} total project(s) tracked by the Executive Engine</p>
+</div>
+
+{% if project_statuses %}
+  {% for ps in project_statuses %}
+  <div class="card project-card">
+    <div class="card-header">
+      <div>
+        <h2>{{ ps.project.title }}</h2>
+        <p class="card-subtitle">{{ ps.project.description }}</p>
+      </div>
+      <div class="card-badges">
+        <span class="badge badge-{{ ps.project.priority.value | lower }}">{{ ps.project.priority.value }}</span>
+        <span class="badge badge-status-{{ ps.project.status.value | lower }}">{{ ps.project.status.value }}</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <!-- Objective -->
+      <div class="field-row">
+        <span class="field-label">Objective:</span>
+        <span class="field-value">{{ ps.project.objective }}</span>
+      </div>
+
+      <!-- Progress -->
+      <div class="field-row">
+        <span class="field-label">Progress:</span>
+        <span class="field-value">{{ ps.status.completion_percentage }}%</span>
+      </div>
+      <div class="progress-bar progress-bar-lg">
+        <div class="progress-fill" style="width: {{ ps.status.completion_percentage }}%"></div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stat-row">
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.status.total_tasks }}</span>
+          <span class="stat-label">Tasks</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.status.task_counts.ASSIGNED | default(0) }}</span>
+          <span class="stat-label">Assigned</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.status.task_counts.APPROVED | default(0) }}</span>
+          <span class="stat-label">Approved</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.status.blocked_tasks | length }}</span>
+          <span class="stat-label">Blocked</span>
+        </div>
+      </div>
+
+      <!-- Task List -->
+      {% if ps.tasks %}
+      <div class="task-list">
+        <h3>Tasks</h3>
+        {% for task in ps.tasks %}
+        <div class="task-item">
+          <span class="task-status badge badge-task-{{ task.status.value | lower }}">{{ task.status.value }}</span>
+          <span class="task-title">{{ task.title }}</span>
+          <span class="task-agent meta-text">{{ task.assigned_agent or 'Unassigned' }}</span>
+          <span class="badge badge-{{ task.priority.value | lower }}">{{ task.priority.value }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card">
+    <div class="card-body">
+      <p class="empty">No projects found.</p>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

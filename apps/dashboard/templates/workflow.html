@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Workflow{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Workflow Status</h1>
+  <p class="page-subtitle">Process execution tracked by the Workflow Engine</p>
+</div>
+
+<!-- Stats Row -->
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-value">{{ wf_stats.total_workflows }}</div>
+    <div class="kpi-label">Total Workflows</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ wf_stats.by_status.get('ACTIVE', 0) }}</div>
+    <div class="kpi-label">Active</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ wf_stats.by_status.get('COMPLETED', 0) }}</div>
+    <div class="kpi-label">Completed</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ wf_stats.by_status.get('PAUSED', 0) }}</div>
+    <div class="kpi-label">Paused</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ wf_stats.by_status.get('CANCELLED', 0) }}</div>
+    <div class="kpi-label">Cancelled</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ "%.0f" | format(wf_stats.average_progress * 100) }}%</div>
+    <div class="kpi-label">Avg Progress</div>
+  </div>
+</div>
+
+<!-- Workflow Cards -->
+{% if wf_details %}
+  {% for detail in wf_details %}
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2>{{ detail.workflow.name }}</h2>
+        <p class="card-subtitle">{{ detail.workflow.description }}</p>
+      </div>
+      <div class="card-badges">
+        <span class="badge badge-status-{{ detail.workflow.status.value | lower }}">
+          {{ detail.workflow.status.value }}
+        </span>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <!-- Progress -->
+      <div class="field-row">
+        <span class="field-label">Progress:</span>
+        <span class="field-value">
+          {{ detail.progress_pct }}% &mdash;
+          {{ detail.completed_count }} / {{ detail.total_stages }} stages
+        </span>
+      </div>
+      <div class="progress-bar progress-bar-lg">
+        <div class="progress-fill" style="width: {{ detail.progress_pct }}%"></div>
+      </div>
+
+      {% if detail.current_stage %}
+      <div class="field-row">
+        <span class="field-label">Current Stage:</span>
+        <span class="field-value highlight">{{ detail.current_stage.name }}</span>
+      </div>
+      {% endif %}
+
+      <!-- Stage Timeline -->
+      <div class="stage-timeline">
+        {% for stage in detail.workflow.stages %}
+        <div class="stage-item
+          {% if stage in detail.workflow.completed_stages %}stage-done
+          {% elif detail.current_stage and stage.id == detail.current_stage.id %}stage-active
+          {% else %}stage-pending{% endif %}">
+          <div class="stage-order">{{ stage.order }}</div>
+          <div class="stage-info">
+            <div class="stage-name">{{ stage.name }}</div>
+            {% if stage.approval_required %}
+            <span class="stage-badge">Approval Required</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card">
+    <div class="card-body">
+      <p class="empty">No workflows found.</p>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

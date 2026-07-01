@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}AI Company OS{% endblock %} | CEO Control Center</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="brand-icon">&#9670;</span>
+      <span class="brand-name">AI Company OS</span>
+      <span class="brand-sub">CEO Control Center</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/" class="{% if page == 'dashboard' %}active{% endif %}">Dashboard</a></li>
+      <li><a href="/projects" class="{% if page == 'projects' %}active{% endif %}">Projects</a></li>
+      <li><a href="/employees" class="{% if page == 'employees' %}active{% endif %}">Employees</a></li>
+      <li><a href="/workflow" class="{% if page == 'workflow' %}active{% endif %}">Workflow</a></li>
+      <li><a href="/events" class="{% if page == 'events' %}active{% endif %}">Events</a></li>
+    </ul>
+    <div class="nav-status">
+      <span class="status-dot"></span>
+      <span class="status-label">LIVE</span>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <span>AI Company OS &mdash; Sprint 15 CEO Control Center</span>
+    <span class="footer-right">Read-Only Dashboard &mdash; Real Data</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

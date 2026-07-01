@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Employees{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Employees</h1>
+  <p class="page-subtitle">{{ total_employees }} total &mdash; {{ active_employees }} active</p>
+</div>
+
+<!-- Department Summary -->
+<div class="card">
+  <div class="card-header">
+    <h2>Departments</h2>
+  </div>
+  <div class="card-body">
+    <div class="dept-grid">
+      {% for dept in departments %}
+      <div class="dept-card">
+        <div class="dept-name">{{ dept.name }}</div>
+        <div class="dept-status">
+          <span class="badge badge-status-{{ dept.status.value | lower }}">{{ dept.status.value }}</span>
+        </div>
+        <div class="dept-capacity">
+          Capacity: {{ dept.capacity }}
+          &bull; Workload: {{ (dept.workload * 100) | round(0) | int }}%
+        </div>
+        {% if dept.director %}
+        <div class="dept-director">Director: {{ dept.director.name }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Employee Table -->
+<div class="card">
+  <div class="card-header">
+    <h2>All Employees</h2>
+  </div>
+  <div class="card-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Department</th>
+          <th>Seniority</th>
+          <th>Status</th>
+          <th>Skills</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+        <tr>
+          <td class="td-name">{{ emp.name }}</td>
+          <td>{{ emp.role.value }}</td>
+          <td>{{ dept_map.get(emp.department.value, emp.department.value) }}</td>
+          <td>
+            <span class="badge badge-seniority-{{ emp.seniority.value | lower }}">{{ emp.seniority.value }}</span>
+          </td>
+          <td>
+            <span class="badge badge-status-{{ emp.status.value | lower }}">{{ emp.status.value }}</span>
+          </td>
+          <td>
+            {% for skill in emp.skills %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

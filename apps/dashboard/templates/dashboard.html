@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Company Overview</h1>
+  <p class="page-subtitle">Real-time status of {{ company_name }}</p>
+</div>
+
+<!-- KPI Row -->
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-value">{{ total_projects }}</div>
+    <div class="kpi-label">Projects</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ active_projects | length }}</div>
+    <div class="kpi-label">Active Projects</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ total_employees }}</div>
+    <div class="kpi-label">Employees</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ active_employees }}</div>
+    <div class="kpi-label">Active Employees</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ total_departments }}</div>
+    <div class="kpi-label">Departments</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">{{ wf_stats.total_workflows }}</div>
+    <div class="kpi-label">Workflows</div>
+  </div>
+</div>
+
+<!-- Grid -->
+<div class="grid-2">
+
+  <!-- Active Projects -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Active Projects</h2>
+      <a href="/projects" class="card-link">View all</a>
+    </div>
+    <div class="card-body">
+      {% if active_projects %}
+        {% for proj in active_projects %}
+        <div class="list-item">
+          <div class="list-item-title">{{ proj.title }}</div>
+          <div class="list-item-meta">
+            <span class="badge badge-{{ proj.priority.value | lower }}">{{ proj.priority.value }}</span>
+            <span class="badge badge-status-{{ proj.status.value | lower }}">{{ proj.status.value }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">No active projects.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Departments -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Departments</h2>
+    </div>
+    <div class="card-body">
+      {% for dept in departments %}
+      <div class="list-item">
+        <div class="list-item-title">{{ dept.name }}</div>
+        <div class="list-item-meta">
+          <span class="badge badge-status-{{ dept.status.value | lower }}">{{ dept.status.value }}</span>
+          <span class="meta-text">Workload: {{ (dept.workload * 100) | round(0) | int }}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: {{ (dept.workload * 100) | round(0) | int }}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Recent Decisions -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Recent Decisions</h2>
+    </div>
+    <div class="card-body">
+      {% if recent_decisions %}
+        {% for dec in recent_decisions %}
+        <div class="list-item">
+          <div class="list-item-title">{{ dec.title }}</div>
+          <div class="list-item-meta">
+            <span class="badge badge-{{ dec.status.value | lower }}">{{ dec.status.value }}</span>
+            {% if dec.recommendation %}
+            <span class="meta-text">&#8594; {{ dec.recommendation }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">No decisions yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Memory Entries -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Recent Memory Entries</h2>
+    </div>
+    <div class="card-body">
+      {% if recent_memory %}
+        {% for entry in recent_memory %}
+        <div class="list-item">
+          <div class="list-item-title">{{ entry.title }}</div>
+          <div class="list-item-meta">
+            <span class="badge badge-category-{{ entry.category.value | lower }}">{{ entry.category.value }}</span>
+            <span class="meta-text">by {{ entry.author }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">No memory entries yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Discussions -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Recent Discussions</h2>
+    </div>
+    <div class="card-body">
+      {% if recent_discussions %}
+        {% for disc in recent_discussions %}
+        <div class="list-item">
+          <div class="list-item-title">{{ disc.topic }}</div>
+          <div class="list-item-meta">
+            <span class="badge badge-{{ disc.status.value | lower }}">{{ disc.status.value }}</span>
+            <span class="meta-text">{{ disc.message_count() }} messages</span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">No discussions yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Live Event Timeline -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Live Event Timeline</h2>
+      <span class="poll-indicator" id="poll-status">polling...</span>
+    </div>
+    <div
+      id="event-timeline"
+      hx-get="/api/events/recent?limit=8"
+      hx-trigger="load, every 5s"
+      hx-swap="innerHTML"
+      class="card-body"
+    >
+      {% for ev in recent_events %}
+      <div class="event-item">
+        <span class="event-channel event-channel-{{ ev.category.value | lower }}">{{ ev.category.value }}</span>
+        <span class="event-source">{{ ev.source }}</span>
+        <span class="event-action">{{ ev.get_payload_value('action', '') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
