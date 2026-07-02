@@ -1,0 +1,73 @@
+{% macro kpi_card(value, label, icon="", trend="", counter=true) %}
+<div class="kpi-card">
+  {% if icon %}<div class="kpi-icon">{{ icon }}</div>{% endif %}
+  <div class="kpi-value {% if counter %}counter-value{% endif %}" {% if counter %}data-target="{{ value }}"{% endif %}>{{ value }}</div>
+  <div class="kpi-label">{{ label }}</div>
+  {% if trend %}<div class="kpi-trend">{{ trend }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro progress_bar(pct, animated=true, size="md", label="") %}
+<div class="progress-bar progress-bar-{{ size }}">
+  <div class="progress-fill {% if animated %}progress-fill-animated{% endif %}" style="width: {{ pct }}%"></div>
+</div>
+{% if label %}<span class="progress-label meta-text">{{ label }}</span>{% endif %}
+{% endmacro %}
+
+{% macro badge(text, variant="default") %}
+<span class="badge badge-{{ variant }}">{{ text }}</span>
+{% endmacro %}
+
+{% macro empty_state(message, icon="○", action_href="", action_label="") %}
+<div class="empty-state">
+  <div class="empty-state-icon">{{ icon }}</div>
+  <p class="empty-state-msg">{{ message }}</p>
+  {% if action_href %}
+  <a href="{{ action_href }}" class="btn-secondary btn-sm">{{ action_label }}</a>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro skeleton(type="line", lines=3) %}
+<div class="skeleton-block">
+  {% if type == "card" %}
+    <div class="skeleton skeleton-title"></div>
+    {% for i in range(lines) %}
+    <div class="skeleton skeleton-line" style="width: {{ [100, 85, 70, 90] | random }}%"></div>
+    {% endfor %}
+  {% elif type == "kpi" %}
+    <div class="skeleton skeleton-kpi-value"></div>
+    <div class="skeleton skeleton-kpi-label"></div>
+  {% else %}
+    {% for i in range(lines) %}
+    <div class="skeleton skeleton-line"></div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro stat_item(value, label, accent=false) %}
+<div class="stat-item {% if accent %}stat-item-accent{% endif %}">
+  <span class="stat-value">{{ value }}</span>
+  <span class="stat-label">{{ label }}</span>
+</div>
+{% endmacro %}
+
+{% macro section_header(title, subtitle="", actions="") %}
+<div class="section-header">
+  <div>
+    <h3 class="section-title">{{ title }}</h3>
+    {% if subtitle %}<p class="section-subtitle">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if actions %}<div class="section-actions">{{ actions }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro filter_bar(placeholder="Ara...", id="search-input") %}
+<div class="filter-bar">
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="search" id="{{ id }}" class="search-input" placeholder="{{ placeholder }}" autocomplete="off" />
+  </div>
+</div>
+{% endmacro %}

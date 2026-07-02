@@ -1,48 +1,163 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% from "partials/macros.html" import kpi_card, progress_bar, empty_state, stat_item %}
+{% block title %}Kontrol Paneli{% endblock %}
 
 {% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
 <div class="page-header">
-  <h1>Company Overview</h1>
-  <p class="page-subtitle">Real-time status of {{ company_name }}</p>
+  <div class="page-header-left">
+    <h1>Şirkete Genel Bakış</h1>
+    <p class="page-subtitle">{{ company_name }} &mdash; gerçek zamanlı canlı operasyon merkezi</p>
+  </div>
+  <div class="page-actions">
+    <span class="meta-text" id="command-status"></span>
+  </div>
 </div>
 
-<!-- KPI Row -->
+<!-- ── CEO Komutu ───────────────────────────────────────────── -->
+<div class="card command-panel">
+  <div class="card-header">
+    <h2>CEO Komutu</h2>
+    <span class="poll-indicator" id="command-status-badge"></span>
+  </div>
+  <div class="card-body">
+    <form id="ceo-command-form">
+      <textarea
+        id="ceo-command-input"
+        class="command-textarea"
+        rows="3"
+        placeholder="Örnek: Bana restoran rezervasyon sistemi olan modern bir web uygulaması geliştir."
+      ></textarea>
+      <div class="command-actions">
+        <button type="submit" class="btn-primary" id="ceo-start-btn">
+          ▶ Şirketi Başlat
+        </button>
+        <span id="command-spinner" class="command-spinner" style="display:none">İşleniyor…</span>
+      </div>
+    </form>
+    {% if last_command %}
+    <div class="command-result command-result-success" id="last-command-result">
+      <span>✓</span>
+      <span>{{ last_command[:80] }}{% if last_command | length > 80 %}…{% endif %}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── KPI Sayaçları ─────────────────────────────────────────── -->
 <div class="kpi-row">
-  <div class="kpi-card">
-    <div class="kpi-value">{{ total_projects }}</div>
-    <div class="kpi-label">Projects</div>
+  {{ kpi_card(total_projects,                  "Projeler",       "◈") }}
+  {{ kpi_card(active_projects | length,        "Aktif Proje",    "◉") }}
+  {{ kpi_card(total_employees,                 "Çalışanlar",     "◎") }}
+  {{ kpi_card(active_employees,                "Aktif Çalışanlar","●") }}
+  {{ kpi_card(total_departments,               "Departmanlar",   "⬡") }}
+  {{ kpi_card(wf_stats.total_workflows,        "İş Akışları",    "↻") }}
+  {{ kpi_card(total_artifacts,                 "Çıktılar",       "◇") }}
+</div>
+
+<!-- ── Yürütme Hattı ─────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Yürütme Hattı</h2>
+    <span class="meta-text">CEO komutu işleme akışı</span>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-value">{{ active_projects | length }}</div>
-    <div class="kpi-label">Active Projects</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-value">{{ total_employees }}</div>
-    <div class="kpi-label">Employees</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-value">{{ active_employees }}</div>
-    <div class="kpi-label">Active Employees</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-value">{{ total_departments }}</div>
-    <div class="kpi-label">Departments</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-value">{{ wf_stats.total_workflows }}</div>
-    <div class="kpi-label">Workflows</div>
+  <div class="card-body">
+    <div class="pipeline">
+      {% set pipeline_steps = [
+        ("CEO",       "Yönetici komutu"),
+        ("Planlayıcı","İstek analizi"),
+        ("Yönetici",  "Proje planlaması"),
+        ("Görevler",  "Görev oluşturma"),
+        ("Ajan",      "Çalışan atama"),
+        ("Prompt",    "İstek hazırlama"),
+        ("Yapay Zekâ","İşlem"),
+        ("Çıktılar",  "Sonuç üretimi"),
+      ] %}
+      {% for step_name, step_desc in pipeline_steps %}
+      {% set step_idx = loop.index0 %}
+      <div class="pipeline-step {% if pipeline_step == step_idx %}pipeline-step-active{% elif pipeline_step > step_idx %}pipeline-step-done{% endif %}">
+        <div class="pipeline-node">{{ step_name }}</div>
+        <div class="pipeline-desc">{{ step_desc }}</div>
+      </div>
+      {% if not loop.last %}
+      <div class="pipeline-connector {% if pipeline_step > step_idx %}pipeline-connector-done{% endif %}">→</div>
+      {% endif %}
+      {% endfor %}
+    </div>
   </div>
 </div>
 
-<!-- Grid -->
+<!-- ── Canlı Durum + Ajan Durumu ────────────────────────────── -->
 <div class="grid-2">
 
-  <!-- Active Projects -->
+  <!-- Canlı Durum -->
   <div class="card">
     <div class="card-header">
-      <h2>Active Projects</h2>
-      <a href="/projects" class="card-link">View all</a>
+      <h2>Canlı Durum</h2>
+      <span class="poll-indicator" id="status-poll-indicator">bekleniyor…</span>
+    </div>
+    <div
+      id="canli-durum-panel"
+      hx-get="/api/status"
+      hx-trigger="load, every 3s"
+      hx-swap="innerHTML"
+      class="card-body status-grid"
+    >
+      <span class="meta-text">Durum yükleniyor…</span>
+    </div>
+  </div>
+
+  <!-- Canlı Şirket Zaman Çizelgesi -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Canlı Şirket Zaman Çizelgesi</h2>
+      <span class="poll-indicator" id="poll-status">bekleniyor…</span>
+    </div>
+    <div
+      id="event-timeline"
+      hx-get="/api/timeline?limit=8"
+      hx-trigger="load, every 3s"
+      hx-swap="innerHTML"
+      class="card-body"
+    >
+      {% for ev in recent_events %}
+      <div class="timeline-item">
+        <span class="timeline-ts">{{ ev.timestamp.strftime('%H:%M') }}</span>
+        <span class="event-channel event-channel-{{ ev.category.value | lower }}">{{ ev.category.value }}</span>
+        <span class="timeline-sentence">{{ ev.get_payload_value('action', '') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Canlı Ajan Durumu ─────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Canlı Ajan Durumu</h2>
+    <span class="poll-indicator" id="agent-poll-status">bekleniyor…</span>
+  </div>
+  <div
+    id="agent-status-panel"
+    hx-get="/api/agent-status"
+    hx-trigger="load, every 3s"
+    hx-swap="innerHTML"
+    class="card-body agent-cards"
+  >
+    <span class="meta-text">Ajan durumu yükleniyor…</span>
+  </div>
+</div>
+
+<!-- ── Grid: Projeler · Departmanlar · Kararlar · Hafıza · Tartışmalar ── -->
+<div class="grid-2">
+
+  <!-- Aktif Projeler -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Aktif Projeler</h2>
+      <a href="/projects" class="card-link">Tümünü gör →</a>
     </div>
     <div class="card-body">
       {% if active_projects %}
@@ -56,15 +171,16 @@
         </div>
         {% endfor %}
       {% else %}
-        <p class="empty">No active projects.</p>
+        {{ empty_state("Aktif proje yok.", "◈", "/projects", "Tüm projeler") }}
       {% endif %}
     </div>
   </div>
 
-  <!-- Departments -->
+  <!-- Departmanlar -->
   <div class="card">
     <div class="card-header">
-      <h2>Departments</h2>
+      <h2>Departmanlar</h2>
+      <a href="/org" class="card-link">Org ağacı →</a>
     </div>
     <div class="card-body">
       {% for dept in departments %}
@@ -72,20 +188,18 @@
         <div class="list-item-title">{{ dept.name }}</div>
         <div class="list-item-meta">
           <span class="badge badge-status-{{ dept.status.value | lower }}">{{ dept.status.value }}</span>
-          <span class="meta-text">Workload: {{ (dept.workload * 100) | round(0) | int }}%</span>
+          <span class="meta-text">İş Yükü: {{ (dept.workload * 100) | round(0) | int }}%</span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: {{ (dept.workload * 100) | round(0) | int }}%"></div>
-        </div>
+        {{ progress_bar((dept.workload * 100) | round(0) | int) }}
       </div>
       {% endfor %}
     </div>
   </div>
 
-  <!-- Recent Decisions -->
+  <!-- Son Kararlar -->
   <div class="card">
     <div class="card-header">
-      <h2>Recent Decisions</h2>
+      <h2>Son Kararlar</h2>
     </div>
     <div class="card-body">
       {% if recent_decisions %}
@@ -95,21 +209,21 @@
           <div class="list-item-meta">
             <span class="badge badge-{{ dec.status.value | lower }}">{{ dec.status.value }}</span>
             {% if dec.recommendation %}
-            <span class="meta-text">&#8594; {{ dec.recommendation }}</span>
+            <span class="meta-text">→ {{ dec.recommendation }}</span>
             {% endif %}
           </div>
         </div>
         {% endfor %}
       {% else %}
-        <p class="empty">No decisions yet.</p>
+        {{ empty_state("Henüz karar yok.", "◇") }}
       {% endif %}
     </div>
   </div>
 
-  <!-- Recent Memory Entries -->
+  <!-- Son Hafıza Kayıtları -->
   <div class="card">
     <div class="card-header">
-      <h2>Recent Memory Entries</h2>
+      <h2>Son Hafıza Kayıtları</h2>
     </div>
     <div class="card-body">
       {% if recent_memory %}
@@ -118,20 +232,20 @@
           <div class="list-item-title">{{ entry.title }}</div>
           <div class="list-item-meta">
             <span class="badge badge-category-{{ entry.category.value | lower }}">{{ entry.category.value }}</span>
-            <span class="meta-text">by {{ entry.author }}</span>
+            <span class="meta-text">{{ entry.author }}</span>
           </div>
         </div>
         {% endfor %}
       {% else %}
-        <p class="empty">No memory entries yet.</p>
+        {{ empty_state("Henüz hafıza kaydı yok.", "○") }}
       {% endif %}
     </div>
   </div>
 
-  <!-- Recent Discussions -->
+  <!-- Son Tartışmalar -->
   <div class="card">
     <div class="card-header">
-      <h2>Recent Discussions</h2>
+      <h2>Son Tartışmalar</h2>
     </div>
     <div class="card-body">
       {% if recent_discussions %}
@@ -140,38 +254,80 @@
           <div class="list-item-title">{{ disc.topic }}</div>
           <div class="list-item-meta">
             <span class="badge badge-{{ disc.status.value | lower }}">{{ disc.status.value }}</span>
-            <span class="meta-text">{{ disc.message_count() }} messages</span>
+            <span class="meta-text">{{ disc.message_count() }} mesaj</span>
           </div>
         </div>
         {% endfor %}
       {% else %}
-        <p class="empty">No discussions yet.</p>
+        {{ empty_state("Henüz tartışma yok.", "◎") }}
       {% endif %}
     </div>
   </div>
 
-  <!-- Live Event Timeline -->
+  <!-- Üretilen Çıktılar (mini) -->
   <div class="card">
     <div class="card-header">
-      <h2>Live Event Timeline</h2>
-      <span class="poll-indicator" id="poll-status">polling...</span>
+      <h2>Üretilen Çıktılar</h2>
+      <span class="meta-text">{{ artifacts | length }} çıktı</span>
     </div>
-    <div
-      id="event-timeline"
-      hx-get="/api/events/recent?limit=8"
-      hx-trigger="load, every 5s"
-      hx-swap="innerHTML"
-      class="card-body"
-    >
-      {% for ev in recent_events %}
-      <div class="event-item">
-        <span class="event-channel event-channel-{{ ev.category.value | lower }}">{{ ev.category.value }}</span>
-        <span class="event-source">{{ ev.source }}</span>
-        <span class="event-action">{{ ev.get_payload_value('action', '') }}</span>
-      </div>
-      {% endfor %}
+    <div class="card-body">
+      {% if artifacts %}
+        <div class="artifact-list">
+          {% for artifact in artifacts[:5] %}
+          <div class="artifact-item">
+            <div class="artifact-info">
+              <span class="artifact-title">{{ artifact.title }}</span>
+              <span class="badge badge-category-task">{{ artifact.type.value }}</span>
+              <span class="meta-text">{{ artifact.word_count() }}k</span>
+            </div>
+            <a href="/api/artifacts/{{ artifact.id }}/download"
+               class="btn-download"
+               download="{{ artifact.title }}.md">↓ İndir</a>
+          </div>
+          {% endfor %}
+        </div>
+        {% if artifacts | length > 5 %}
+        <p class="meta-text" style="margin-top:.75rem; text-align:center;">
+          +{{ artifacts | length - 5 }} daha
+        </p>
+        {% endif %}
+      {% else %}
+        {{ empty_state("Henüz üretilmiş çıktı yok. CEO komutu vererek başlatın.", "◇") }}
+      {% endif %}
     </div>
   </div>
 
 </div>
+
+<!-- ── CEO Komut Geçmişi ──────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>CEO Komut Geçmişi</h2>
+    <span class="meta-text">{{ command_history | length }} komut</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if command_history %}
+      <div class="cmd-history-list">
+        {% for cmd in command_history %}
+        <div class="cmd-history-item">
+          <div class="cmd-history-command">
+            {{ cmd.command[:80] }}{% if cmd.command | length > 80 %}…{% endif %}
+          </div>
+          <div class="cmd-history-meta">
+            <span class="cmd-ts">{{ cmd.started_at[:19] | replace("T", " ") }}</span>
+            <span class="cmd-duration">{{ cmd.duration_seconds }}s</span>
+            <span class="badge {% if cmd.success %}badge-status-completed{% else %}badge-status-cancelled{% endif %}">
+              {% if cmd.success %}✓ Tamamlandı{% else %}✕ Başarısız{% endif %}
+            </span>
+            <span class="meta-text">{{ cmd.event_count }} olay</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      {{ empty_state("Henüz komut verilmedi.", "▷") }}
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

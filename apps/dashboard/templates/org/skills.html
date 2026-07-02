@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, empty_state, filter_bar %}
+{% block title %}Yetenekler{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Yetenek Yönetimi</h1>
+    <p class="page-subtitle">Organizasyondaki yetenekleri tanımlayın ve takip edin</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openNewSkillModal()">+ Yeni Yetenek</button>
+  </div>
+</div>
+
+<!-- ── KPI ───────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_skills,    "Toplam Yetenek", "◇", counter=false) }}
+  {{ kpi_card(stats.total_employees, "Toplam Çalışan", "◎", counter=false) }}
+</div>
+
+<!-- ── Search ────────────────────────────────────────────────── -->
+{{ filter_bar("Yetenek ara…", "skill-search") }}
+
+<!-- ── Skills Table ──────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Yetenekler</h2>
+    <span class="meta-text">{{ skill_data | length }} yetenek</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if skill_data %}
+    <table class="org-table" id="skills-table">
+      <thead>
+        <tr>
+          <th>Yetenek Adı</th>
+          <th>Kategori</th>
+          <th>Sahip Çalışan</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in skill_data %}
+        {% set skill = item.skill %}
+        <tr class="skill-row" data-name="{{ skill.name | lower }}">
+          <td>
+            <span class="org-skill-pill">{{ skill.name }}</span>
+          </td>
+          <td>
+            <span class="meta-text">{{ skill.category or '—' }}</span>
+          </td>
+          <td>
+            <span class="badge">{{ item.employee_count }}</span>
+          </td>
+          <td>
+            <div class="org-actions">
+              <button class="btn-secondary btn-sm"
+                onclick="openEditSkillModal('{{ skill.id }}','{{ skill.name }}','{{ skill.category }}')">
+                Düzenle
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="padding:var(--sp-5)">
+        {{ empty_state("Henüz yetenek yok. + Yeni Yetenek butonuyla ekleyin.", "◇") }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── New Skill Modal ───────────────────────────────────────── -->
+<div class="org-modal-overlay" id="new-skill-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeNewSkillModal()">✕</button>
+    <div class="org-modal-title">Yeni Yetenek Ekle</div>
+    <form id="new-skill-form" onsubmit="submitNewSkillForm(event)">
+      <div class="form-row">
+        <label for="new-skill-name">Yetenek Adı</label>
+        <input type="text" id="new-skill-name" placeholder="Örn: Blender, Unity, SEO…" required />
+      </div>
+      <div class="form-row">
+        <label for="new-skill-cat">Kategori (opsiyonel)</label>
+        <input type="text" id="new-skill-cat" placeholder="Örn: Programlama, Tasarım, Pazarlama…" />
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeNewSkillModal()">İptal</button>
+        <button type="submit" class="btn-primary">Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Edit Skill Modal ──────────────────────────────────────── -->
+<div class="org-modal-overlay" id="edit-skill-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeEditSkillModal()">✕</button>
+    <div class="org-modal-title">Yetenek Düzenle</div>
+    <form id="edit-skill-form" onsubmit="submitEditSkillForm(event)">
+      <input type="hidden" id="edit-skill-id" />
+      <div class="form-row">
+        <label for="edit-skill-name">Yetenek Adı</label>
+        <input type="text" id="edit-skill-name" required />
+      </div>
+      <div class="form-row">
+        <label for="edit-skill-cat">Kategori</label>
+        <input type="text" id="edit-skill-cat" />
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeEditSkillModal()">İptal</button>
+        <button type="submit" class="btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  var inp = document.getElementById('skill-search');
+  if(inp) inp.addEventListener('input', function(){
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('.skill-row').forEach(function(r){
+      r.style.display = r.dataset.name.includes(q) ? '' : 'none';
+    });
+  });
+
+  window.openNewSkillModal  = function(){ document.getElementById('new-skill-modal').classList.add('open'); };
+  window.closeNewSkillModal = function(){ document.getElementById('new-skill-modal').classList.remove('open'); };
+  window.submitNewSkillForm = function(e){
+    e.preventDefault();
+    fetch('/api/org/skills', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('new-skill-name').value,
+        category: document.getElementById('new-skill-cat').value,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Yetenek oluşturuldu.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+
+  window.openEditSkillModal = function(id, name, cat){
+    document.getElementById('edit-skill-id').value = id;
+    document.getElementById('edit-skill-name').value = name;
+    document.getElementById('edit-skill-cat').value = cat;
+    document.getElementById('edit-skill-modal').classList.add('open');
+  };
+  window.closeEditSkillModal = function(){ document.getElementById('edit-skill-modal').classList.remove('open'); };
+  window.submitEditSkillForm = function(e){
+    e.preventDefault();
+    var id = document.getElementById('edit-skill-id').value;
+    fetch('/api/org/skills/'+id, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('edit-skill-name').value,
+        category: document.getElementById('edit-skill-cat').value,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Yetenek güncellendi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+})();
+</script>
+
+{% endblock %}

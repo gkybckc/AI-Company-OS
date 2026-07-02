@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, empty_state, filter_bar %}
+{% block title %}Org Çalışanlar{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Çalışan Yönetimi</h1>
+    <p class="page-subtitle">Tüm çalışanları buradan yönetin</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openNewEmpModal()">+ Yeni Çalışan</button>
+  </div>
+</div>
+
+<!-- ── KPI ───────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_employees,      "Toplam Çalışan", "◎", counter=false) }}
+  {{ kpi_card(stats.active_employees,     "Aktif",          "●", counter=false) }}
+  {{ kpi_card(stats.suspended_employees,  "Askıya Alınmış", "‖", counter=false) }}
+  {{ kpi_card(stats.terminated_employees, "Sonlandırılmış", "✕", counter=false) }}
+</div>
+
+<!-- ── Search ────────────────────────────────────────────────── -->
+{{ filter_bar("Çalışan ara…", "emp-org-search") }}
+
+<!-- ── Employees Table ───────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Çalışanlar</h2>
+    <span class="meta-text">{{ emp_data | length }} çalışan</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if emp_data %}
+    <table class="org-table" id="emp-org-table">
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Rol</th>
+          <th>Departman</th>
+          <th>Yetenekler</th>
+          <th>Sağlayıcı</th>
+          <th>Mevcut Görev</th>
+          <th>Durum</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in emp_data %}
+        {% set emp = item.emp %}
+        <tr class="emp-org-row" data-name="{{ emp.name | lower }}">
+          <td><strong>{{ emp.name }}</strong></td>
+          <td>
+            {% if item.role %}
+              <span class="meta-text">{{ item.role.name }}</span>
+            {% else %}
+              <span class="meta-text" style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.dept %}
+              <span class="meta-text">{{ item.dept.name }}</span>
+            {% else %}
+              <span class="meta-text" style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% for sk in emp.skills[:3] %}
+            <span class="org-skill-pill">{{ sk }}</span>
+            {% endfor %}
+            {% if emp.skills | length > 3 %}
+            <span class="meta-text">+{{ emp.skills | length - 3 }}</span>
+            {% endif %}
+          </td>
+          <td><span class="meta-text">{{ emp.provider }}</span></td>
+          <td>
+            {% if emp.current_task %}
+              <span class="meta-text">{{ emp.current_task[:40] }}{% if emp.current_task | length > 40 %}…{% endif %}</span>
+            {% else %}
+              <span class="meta-text" style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge status-badge-{{ emp.status }}">
+              {% if emp.status == 'active' %}Aktif
+              {% elif emp.status == 'suspended' %}Askıya Alındı
+              {% else %}Sonlandırıldı{% endif %}
+            </span>
+          </td>
+          <td>
+            <div class="org-actions">
+              <button class="btn-secondary btn-sm"
+                onclick="openEditEmpModal('{{ emp.id }}','{{ emp.name }}','{{ emp.role_id }}','{{ emp.provider }}')">
+                Düzenle
+              </button>
+              {% if emp.status == 'active' %}
+              <button class="btn-secondary btn-sm"
+                onclick="openTransferModal('{{ emp.id }}','{{ emp.name }}')">
+                Transfer
+              </button>
+              <button class="btn-secondary btn-sm"
+                onclick="suspendEmp('{{ emp.id }}')">
+                Askıya Al
+              </button>
+              {% elif emp.status == 'suspended' %}
+              <button class="btn-secondary btn-sm"
+                onclick="reactivateEmp('{{ emp.id }}')">
+                Reaktive Et
+              </button>
+              {% endif %}
+              {% if emp.status != 'terminated' %}
+              <button class="btn-secondary btn-sm" style="color:var(--red)"
+                onclick="terminateEmp('{{ emp.id }}','{{ emp.name }}')">
+                Sonlandır
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="padding:var(--sp-5)">
+        {{ empty_state("Henüz çalışan yok. + Yeni Çalışan butonuyla ekleyin.", "◎") }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── New Employee Modal ────────────────────────────────────── -->
+<div class="org-modal-overlay" id="new-emp-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeNewEmpModal()">✕</button>
+    <div class="org-modal-title">Yeni Çalışan</div>
+    <form id="new-emp-form" onsubmit="submitNewEmpForm(event)">
+      <div class="form-row">
+        <label for="new-emp-name">Ad Soyad</label>
+        <input type="text" id="new-emp-name" placeholder="Örn: Zeynep Kaya" required />
+      </div>
+      <div class="form-row">
+        <label for="new-emp-role">Rol</label>
+        <select id="new-emp-role" required>
+          <option value="">— Rol seçin —</option>
+          {% for role in roles %}
+          <option value="{{ role.id }}">{{ role.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="new-emp-dept">Departman (opsiyonel)</label>
+        <select id="new-emp-dept">
+          <option value="">— Departman yok —</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}">{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="new-emp-provider">Sağlayıcı</label>
+        <select id="new-emp-provider">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+          <option value="mock">Mock</option>
+        </select>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeNewEmpModal()">İptal</button>
+        <button type="submit" class="btn-primary">Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Edit Employee Modal ───────────────────────────────────── -->
+<div class="org-modal-overlay" id="edit-emp-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeEditEmpModal()">✕</button>
+    <div class="org-modal-title">Çalışan Düzenle</div>
+    <form id="edit-emp-form" onsubmit="submitEditEmpForm(event)">
+      <input type="hidden" id="edit-emp-id" />
+      <div class="form-row">
+        <label for="edit-emp-name">Ad Soyad</label>
+        <input type="text" id="edit-emp-name" required />
+      </div>
+      <div class="form-row">
+        <label for="edit-emp-role">Rol</label>
+        <select id="edit-emp-role">
+          {% for role in roles %}
+          <option value="{{ role.id }}">{{ role.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="edit-emp-provider">Sağlayıcı</label>
+        <select id="edit-emp-provider">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+          <option value="mock">Mock</option>
+        </select>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeEditEmpModal()">İptal</button>
+        <button type="submit" class="btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Transfer Employee Modal ──────────────────────────────── -->
+<div class="org-modal-overlay" id="transfer-emp-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeTransferModal()">✕</button>
+    <div class="org-modal-title">Çalışan Transfer Et</div>
+    <form id="transfer-form" onsubmit="submitTransferForm(event)">
+      <input type="hidden" id="transfer-emp-id" />
+      <p class="meta-text" id="transfer-emp-label" style="margin-bottom:var(--sp-3)"></p>
+      <div class="form-row">
+        <label for="transfer-dept">Hedef Departman</label>
+        <select id="transfer-dept" required>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}">{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeTransferModal()">İptal</button>
+        <button type="submit" class="btn-primary">Transfer Et</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  var inp = document.getElementById('emp-org-search');
+  if (inp) inp.addEventListener('input', function(){
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('.emp-org-row').forEach(function(r){
+      r.style.display = r.dataset.name.includes(q) ? '' : 'none';
+    });
+  });
+
+  window.openNewEmpModal  = function(){ document.getElementById('new-emp-modal').classList.add('open'); };
+  window.closeNewEmpModal = function(){ document.getElementById('new-emp-modal').classList.remove('open'); };
+
+  window.submitNewEmpForm = function(e){
+    e.preventDefault();
+    fetch('/api/org/employees', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('new-emp-name').value,
+        role_id: document.getElementById('new-emp-role').value,
+        department_id: document.getElementById('new-emp-dept').value || null,
+        provider: document.getElementById('new-emp-provider').value,
+        skills: [],
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Çalışan oluşturuldu.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+
+  window.openEditEmpModal = function(id, name, roleId, provider){
+    document.getElementById('edit-emp-id').value = id;
+    document.getElementById('edit-emp-name').value = name;
+    var rs = document.getElementById('edit-emp-role');
+    for(var i=0;i<rs.options.length;i++) if(rs.options[i].value===roleId) rs.selectedIndex=i;
+    var ps = document.getElementById('edit-emp-provider');
+    for(var i=0;i<ps.options.length;i++) if(ps.options[i].value===provider) ps.selectedIndex=i;
+    document.getElementById('edit-emp-modal').classList.add('open');
+  };
+  window.closeEditEmpModal = function(){ document.getElementById('edit-emp-modal').classList.remove('open'); };
+  window.submitEditEmpForm = function(e){
+    e.preventDefault();
+    var id = document.getElementById('edit-emp-id').value;
+    fetch('/api/org/employees/'+id, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('edit-emp-name').value,
+        role_id: document.getElementById('edit-emp-role').value,
+        provider: document.getElementById('edit-emp-provider').value,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Çalışan güncellendi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+
+  window.openTransferModal = function(id, name){
+    document.getElementById('transfer-emp-id').value = id;
+    document.getElementById('transfer-emp-label').textContent = name + ' transfer ediliyor.';
+    document.getElementById('transfer-emp-modal').classList.add('open');
+  };
+  window.closeTransferModal = function(){ document.getElementById('transfer-emp-modal').classList.remove('open'); };
+  window.submitTransferForm = function(e){
+    e.preventDefault();
+    var id = document.getElementById('transfer-emp-id').value;
+    fetch('/api/org/employees/'+id+'/transfer', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({department_id: document.getElementById('transfer-dept').value})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Çalışan transfer edildi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+
+  window.suspendEmp = function(id){
+    fetch('/api/org/employees/'+id+'/suspend', {method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Bilgi','Çalışan askıya alındı.','info'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+  window.reactivateEmp = function(id){
+    fetch('/api/org/employees/'+id+'/reactivate', {method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Çalışan reaktive edildi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+  window.terminateEmp = function(id, name){
+    if(!confirm(name + ' çalışanını sonlandırmak istediğinizden emin misiniz? Bu işlem geri alınamaz.')) return;
+    fetch('/api/org/employees/'+id+'/terminate', {method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Bilgi','Çalışan sonlandırıldı.','info'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+})();
+</script>
+
+{% endblock %}

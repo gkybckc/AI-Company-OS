@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, empty_state %}
+{% block title %}Politikalar{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Is Birligi Politikalari</h1>
+    <p class="page-subtitle">Konusma onay ve inceleme politikalari — veri tabanli, hardcode yok</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openNewPolicyModal()">+ Yeni Politika</button>
+  </div>
+</div>
+
+<!-- ── KPI ──────────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_policies, "Toplam Politika", "§", counter=false) }}
+  {{ kpi_card(stats.blocking_policies, "Engelleyici", "!", counter=false) }}
+  {{ kpi_card(stats.non_blocking_policies, "Bilgi Amacli", "i", counter=false) }}
+</div>
+
+<!-- ── Policy Table ──────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Politika Listesi</h2>
+    <span class="meta-text">{{ policies | length }} politika</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if policies %}
+    <table class="org-table">
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Aciklama</th>
+          <th>Tetikleyen Rol</th>
+          <th>Tetikleyen Kategori</th>
+          <th>Gereken Inceleyici</th>
+          <th>Gereken Yanit</th>
+          <th>Sablon</th>
+          <th>Engelleyici</th>
+          <th>Islem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in policies %}
+        <tr>
+          <td><strong>{{ p.name }}</strong></td>
+          <td class="meta-text" style="font-size:11px;max-width:200px">{{ p.description }}</td>
+          <td>
+            {% if p.trigger_role %}
+            <span class="org-skill-pill">{{ p.trigger_role }}</span>
+            {% else %}
+            <span class="meta-text">Her rol</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.trigger_category %}
+            <span class="org-skill-pill" style="background:#1e3a5f">{{ p.trigger_category | replace('_',' ') | title }}</span>
+            {% else %}
+            <span class="meta-text">Her kategori</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.required_reviewer_role %}
+            <span class="org-skill-pill">{{ p.required_reviewer_role }}</span>
+            {% else %}
+            <span class="meta-text">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.required_response_category %}
+            <span class="org-skill-pill" style="background:#162416">{{ p.required_response_category | replace('_',' ') | title }}</span>
+            {% else %}
+            <span class="meta-text">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.applies_to_template %}
+            <span class="org-skill-pill">{{ p.applies_to_template | replace('_',' ') | title }}</span>
+            {% else %}
+            <span class="meta-text">Tumu</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.is_blocking %}
+            <span class="badge" style="background:#3a1a1a;color:#ef4444">Evet</span>
+            {% else %}
+            <span class="badge" style="background:#162416;color:#84cc16">Hayir</span>
+            {% endif %}
+          </td>
+          <td>
+            <button class="btn-secondary btn-sm" onclick="removePolicy('{{ p.name }}')">Kaldir</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:var(--sp-5)">
+      {{ empty_state("Henuz politika yok. + Yeni Politika butonuyla ekleyin.","§") }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Policy Evaluation Panel ──────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Politika Degerlendirme</h2>
+    <span class="meta-text">Secili konusma icin ihlalleri goster</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:var(--sp-3);align-items:flex-end">
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:4px">Konusma</label>
+        <select id="eval-conv-id" style="min-width:220px">
+          {% for conv in all_conversations %}
+          <option value="{{ conv.id }}">{{ conv.title[:40] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn-primary" onclick="evaluatePolicies()">Degerlendir</button>
+    </div>
+    <div id="eval-result" style="margin-top:var(--sp-4)"></div>
+  </div>
+</div>
+
+<!-- ── New Policy Modal ──────────────────────────────────────────── -->
+<div class="org-modal-overlay" id="new-policy-modal">
+  <div class="org-modal" role="dialog" aria-modal="true" style="max-width:520px">
+    <button class="org-modal-close" onclick="closeNewPolicyModal()">x</button>
+    <div class="org-modal-title">Yeni Politika</div>
+    <form id="new-policy-form" onsubmit="submitNewPolicy(event)">
+      <div class="form-row">
+        <label>Ad</label>
+        <input type="text" id="pol-name" placeholder="benzersiz-politika-adi" required />
+      </div>
+      <div class="form-row">
+        <label>Aciklama</label>
+        <input type="text" id="pol-desc" placeholder="Ne zaman ve ne icin?" required />
+      </div>
+      <div class="form-row">
+        <label>Tetikleyen Rol (bos = her rol)</label>
+        <input type="text" id="pol-trigger-role" placeholder="security_engineer" />
+      </div>
+      <div class="form-row">
+        <label>Tetikleyen Kategori (bos = her kategori)</label>
+        <select id="pol-trigger-cat">
+          <option value="">— Her kategori —</option>
+          <option value="question">Soru</option>
+          <option value="answer">Yanit</option>
+          <option value="proposal">Oneri</option>
+          <option value="review">Inceleme</option>
+          <option value="approval_request">Onay Istegi</option>
+          <option value="warning">Uyari</option>
+          <option value="risk">Risk</option>
+          <option value="decision">Karar</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Gereken Inceleyici Rol (opsiyonel)</label>
+        <input type="text" id="pol-reviewer-role" placeholder="cto" />
+      </div>
+      <div class="form-row">
+        <label>Gereken Yanit Kategorisi (opsiyonel)</label>
+        <select id="pol-response-cat">
+          <option value="">— Gerekmiyor —</option>
+          <option value="review">Inceleme</option>
+          <option value="approval_request">Onay Istegi</option>
+          <option value="decision">Karar</option>
+          <option value="answer">Yanit</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Sablon (bos = tum sablonlar)</label>
+        <select id="pol-template">
+          <option value="">— Tum sablonlar —</option>
+          {% for tmpl in all_templates %}
+          <option value="{{ tmpl.template_type }}">{{ tmpl.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label style="display:flex;gap:.5rem;align-items:center">
+          <input type="checkbox" id="pol-blocking" checked />
+          Engelleyici (ihlal konusmayi bloklarsa)
+        </label>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeNewPolicyModal()">Iptal</button>
+        <button type="submit" class="btn-primary">Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  window.openNewPolicyModal  = function(){ document.getElementById('new-policy-modal').classList.add('open'); };
+  window.closeNewPolicyModal = function(){ document.getElementById('new-policy-modal').classList.remove('open'); };
+
+  window.submitNewPolicy = function(e){
+    e.preventDefault();
+    fetch('/api/collab/policies',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name:                     document.getElementById('pol-name').value,
+        description:              document.getElementById('pol-desc').value,
+        trigger_role:             document.getElementById('pol-trigger-role').value,
+        trigger_category:         document.getElementById('pol-trigger-cat').value,
+        required_reviewer_role:   document.getElementById('pol-reviewer-role').value,
+        required_response_category: document.getElementById('pol-response-cat').value,
+        applies_to_template:      document.getElementById('pol-template').value || null,
+        is_blocking:              document.getElementById('pol-blocking').checked,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Basarili','Politika eklendi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+
+  window.removePolicy = function(name){
+    if(!confirm('Politika kaldirilsin mi: '+name)) return;
+    fetch('/api/collab/policies/'+encodeURIComponent(name),{method:'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Bilgi','Politika kaldirildi.','info'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+
+  window.evaluatePolicies = function(){
+    var id = document.getElementById('eval-conv-id').value;
+    if(!id) return;
+    fetch('/api/collab/conversations/'+id+'/evaluate-policies')
+    .then(function(r){ return r.json(); }).then(function(d){
+      var el = document.getElementById('eval-result');
+      if(!d.violations || d.violations.length === 0){
+        el.innerHTML = '<span class="badge" style="background:#162416;color:#84cc16">Ihlal yok</span>';
+        return;
+      }
+      var html = d.violations.map(function(v){
+        return '<div style="padding:var(--sp-2) var(--sp-3);border-radius:6px;margin-bottom:var(--sp-2);'
+          + (v.is_blocking ? 'background:#3a1a1a;border-left:3px solid #ef4444' : 'background:#2e2214;border-left:3px solid #f97316')
+          + '">'
+          + '<strong>' + v.policy_name + '</strong>'
+          + ' <span class="badge" style="font-size:10px">' + (v.is_blocking ? 'Engelleyici':'Bilgi') + '</span>'
+          + '<div class="meta-text" style="margin-top:.25rem">' + v.description + '</div>'
+          + '</div>';
+      }).join('');
+      el.innerHTML = html;
+    });
+  };
+})();
+</script>
+
+{% endblock %}

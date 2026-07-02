@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, progress_bar, empty_state, filter_bar %}
+{% block title %}Departmanlar{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Departman Yönetimi</h1>
+    <p class="page-subtitle">Organizasyon yapısını buradan yönetin</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openDeptModal()">+ Yeni Departman</button>
+  </div>
+</div>
+
+<!-- ── KPI ───────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_departments,        "Toplam Departman",  "⬡", counter=false) }}
+  {{ kpi_card(stats.active_departments,       "Aktif",             "●", counter=false) }}
+  {{ kpi_card(stats.inactive_departments,     "Pasif",             "○", counter=false) }}
+  {{ kpi_card(stats.departments_with_directors, "Direktörlü",      "◈", counter=false) }}
+</div>
+
+<!-- ── Search ────────────────────────────────────────────────── -->
+{{ filter_bar("Departman ara…", "dept-search") }}
+
+<!-- ── Departments Table ──────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Departmanlar</h2>
+    <span class="meta-text">{{ dept_data | length }} departman</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if dept_data %}
+    <table class="org-table" id="dept-table">
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Direktör</th>
+          <th>Üye Sayısı</th>
+          <th>Kapasite</th>
+          <th>Doluluk</th>
+          <th>Durum</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in dept_data %}
+        {% set dept = item.dept %}
+        <tr class="dept-row" data-name="{{ dept.name | lower }}">
+          <td>
+            <a href="#" class="list-item-title" style="text-decoration:none; color:inherit">
+              {{ dept.name }}
+            </a>
+          </td>
+          <td>
+            {% if item.director %}
+              <span class="meta-text">{{ item.director.name }}</span>
+            {% else %}
+              <span class="meta-text" style="color:var(--gray-400)">—</span>
+            {% endif %}
+          </td>
+          <td><span class="badge">{{ dept.member_count() }}</span></td>
+          <td><span class="meta-text">{{ dept.capacity }}</span></td>
+          <td style="min-width:120px">
+            <div style="display:flex; align-items:center; gap:.5rem">
+              {{ progress_bar(dept.workload_pct() | int, animated=false, size="sm") }}
+              <span class="meta-text">{{ dept.workload_pct() }}%</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge status-badge-{{ dept.status }}">
+              {% if dept.status == 'active' %}Aktif{% else %}Pasif{% endif %}
+            </span>
+          </td>
+          <td>
+            <div class="org-actions">
+              <button class="btn-secondary btn-sm"
+                onclick="openEditDeptModal('{{ dept.id }}','{{ dept.name }}',{{ dept.capacity }})">
+                Düzenle
+              </button>
+              {% if dept.status == 'active' %}
+              <button class="btn-secondary btn-sm"
+                onclick="disableDept('{{ dept.id }}')">
+                Pasif Yap
+              </button>
+              {% else %}
+              <button class="btn-secondary btn-sm"
+                onclick="enableDept('{{ dept.id }}')">
+                Aktif Et
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="padding:var(--sp-5)">
+        {{ empty_state("Henüz departman yok. + Yeni Departman butonuyla ekleyin.", "⬡") }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Members Panel ─────────────────────────────────────────── -->
+{% for item in dept_data %}
+{% set dept = item.dept %}
+{% if item.members %}
+<div class="card">
+  <div class="card-header">
+    <h2>{{ dept.name }} — Çalışanlar</h2>
+    <span class="meta-text">{{ item.members | length }} kişi</span>
+  </div>
+  <div class="card-body">
+    <div class="agent-cards">
+      {% for emp in item.members %}
+      <div class="agent-card">
+        <div class="agent-card-name">{{ emp.name }}</div>
+        <div class="agent-card-role meta-text">{{ emp.role_id }}</div>
+        <div class="agent-card-skills">
+          {% for sk in emp.skills[:3] %}
+          <span class="org-skill-pill">{{ sk }}</span>
+          {% endfor %}
+        </div>
+        <div class="agent-card-status">
+          <span class="badge status-badge-{{ emp.status }}">{{ emp.status | capitalize }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- ── New Department Modal ───────────────────────────────────── -->
+<div class="org-modal-overlay" id="dept-modal-overlay">
+  <div class="org-modal" role="dialog" aria-modal="true" aria-labelledby="dept-modal-title">
+    <button class="org-modal-close" onclick="closeDeptModal()">✕</button>
+    <div class="org-modal-title" id="dept-modal-title">Yeni Departman</div>
+    <form id="dept-form" onsubmit="submitDeptForm(event)">
+      <div class="form-row">
+        <label for="dept-name">Departman Adı</label>
+        <input type="text" id="dept-name" name="name" placeholder="Örn: Pazarlama" required />
+      </div>
+      <div class="form-row">
+        <label for="dept-capacity">Kapasite</label>
+        <input type="number" id="dept-capacity" name="capacity" value="10" min="1" max="100" />
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeDeptModal()">İptal</button>
+        <button type="submit" class="btn-primary" id="dept-submit-btn">Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Edit Department Modal ─────────────────────────────────── -->
+<div class="org-modal-overlay" id="dept-edit-overlay">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeEditDeptModal()">✕</button>
+    <div class="org-modal-title">Departman Düzenle</div>
+    <form id="dept-edit-form" onsubmit="submitEditDeptForm(event)">
+      <input type="hidden" id="edit-dept-id" />
+      <div class="form-row">
+        <label for="edit-dept-name">Departman Adı</label>
+        <input type="text" id="edit-dept-name" name="name" required />
+      </div>
+      <div class="form-row">
+        <label for="edit-dept-capacity">Kapasite</label>
+        <input type="number" id="edit-dept-capacity" name="capacity" min="1" max="100" />
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeEditDeptModal()">İptal</button>
+        <button type="submit" class="btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Search
+  var inp = document.getElementById('dept-search');
+  if (inp) {
+    inp.addEventListener('input', function() {
+      var q = this.value.toLowerCase();
+      document.querySelectorAll('.dept-row').forEach(function(row) {
+        row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+      });
+    });
+  }
+
+  // Create modal
+  window.openDeptModal = function() {
+    document.getElementById('dept-modal-overlay').classList.add('open');
+  };
+  window.closeDeptModal = function() {
+    document.getElementById('dept-modal-overlay').classList.remove('open');
+  };
+  window.submitDeptForm = function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('dept-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Oluşturuluyor…';
+    fetch('/api/org/departments', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('dept-name').value,
+        capacity: parseInt(document.getElementById('dept-capacity').value) || 10,
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) {
+        if (window.showToast) showToast('Başarılı', 'Departman oluşturuldu.', 'success');
+        setTimeout(function() { location.reload(); }, 900);
+      } else {
+        if (window.showToast) showToast('Hata', d.error || 'Bir hata oluştu.', 'error');
+        btn.disabled = false; btn.textContent = 'Oluştur';
+      }
+    });
+  };
+
+  // Edit modal
+  window.openEditDeptModal = function(id, name, cap) {
+    document.getElementById('edit-dept-id').value = id;
+    document.getElementById('edit-dept-name').value = name;
+    document.getElementById('edit-dept-capacity').value = cap;
+    document.getElementById('dept-edit-overlay').classList.add('open');
+  };
+  window.closeEditDeptModal = function() {
+    document.getElementById('dept-edit-overlay').classList.remove('open');
+  };
+  window.submitEditDeptForm = function(e) {
+    e.preventDefault();
+    var id = document.getElementById('edit-dept-id').value;
+    fetch('/api/org/departments/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('edit-dept-name').value,
+        capacity: parseInt(document.getElementById('edit-dept-capacity').value) || 10,
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.success) {
+        if (window.showToast) showToast('Başarılı', 'Departman güncellendi.', 'success');
+        setTimeout(function() { location.reload(); }, 900);
+      } else {
+        if (window.showToast) showToast('Hata', d.error || 'Bir hata oluştu.', 'error');
+      }
+    });
+  };
+
+  // Disable / Enable
+  window.disableDept = function(id) {
+    fetch('/api/org/departments/' + id + '/disable', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.success) {
+        if (window.showToast) showToast('Bilgi', 'Departman pasif yapıldı.', 'info');
+        setTimeout(function(){ location.reload(); }, 900);
+      } else {
+        if (window.showToast) showToast('Hata', d.error || 'Bir hata oluştu.', 'error');
+      }
+    });
+  };
+  window.enableDept = function(id) {
+    fetch('/api/org/departments/' + id + '/enable', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.success) {
+        if (window.showToast) showToast('Bilgi', 'Departman aktif edildi.', 'success');
+        setTimeout(function(){ location.reload(); }, 900);
+      } else {
+        if (window.showToast) showToast('Hata', d.error || 'Bir hata oluştu.', 'error');
+      }
+    });
+  };
+})();
+</script>
+
+{% endblock %}

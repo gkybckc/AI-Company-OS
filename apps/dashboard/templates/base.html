@@ -1,41 +1,92 @@
-<!DOCTYPE html>
-<html lang="en">
+﻿<!DOCTYPE html>
+<html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}AI Company OS{% endblock %} | CEO Control Center</title>
+  <title>{% block title %}AI Company OS{% endblock %} | CEO Komuta Merkezi</title>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
+
+  <!-- ── Top Navigation ───────────────────────────────────── -->
   <nav class="navbar">
-    <div class="nav-brand">
-      <span class="brand-icon">&#9670;</span>
+
+    <a class="nav-brand" href="/">
+      <span class="brand-icon">◆</span>
       <span class="brand-name">AI Company OS</span>
-      <span class="brand-sub">CEO Control Center</span>
+      <span class="brand-sub">CEO · Sprint 19</span>
+    </a>
+
+    <div class="nav-search">
+      <i class="nav-search-icon">⌕</i>
+      <input
+        id="global-search"
+        type="search"
+        class="nav-search-input"
+        placeholder="Ara..."
+        autocomplete="off"
+        aria-label="Global arama"
+      />
+      <span class="nav-search-kbd">⌘K</span>
     </div>
+
     <ul class="nav-links">
-      <li><a href="/" class="{% if page == 'dashboard' %}active{% endif %}">Dashboard</a></li>
-      <li><a href="/projects" class="{% if page == 'projects' %}active{% endif %}">Projects</a></li>
-      <li><a href="/employees" class="{% if page == 'employees' %}active{% endif %}">Employees</a></li>
-      <li><a href="/workflow" class="{% if page == 'workflow' %}active{% endif %}">Workflow</a></li>
-      <li><a href="/events" class="{% if page == 'events' %}active{% endif %}">Events</a></li>
+      <li><a href="/"          class="{% if page == 'dashboard' %}active{% endif %}">Kontrol Paneli</a></li>
+      <li><a href="/projects"  class="{% if page == 'projects'  %}active{% endif %}">Projeler</a></li>
+      <li><a href="/employees" class="{% if page == 'employees' %}active{% endif %}">Çalışanlar</a></li>
+      <li><a href="/workflow"  class="{% if page == 'workflow'  %}active{% endif %}">İş Akışları</a></li>
+      <li><a href="/events"    class="{% if page == 'events'    %}active{% endif %}">Canlı Olay Akışı</a></li>
+      <li><a href="/org"       class="{% if page == 'org'       %}active{% endif %}">Organizasyon</a></li>
+      <li><a href="/collab"   class="{% if page in ['collab','collab_conversations','collab_sessions','collab_policies'] %}active{% endif %}">Is Birligi</a></li>
     </ul>
+
+    <button class="nav-bell" id="nav-bell-btn" title="Bildirimler" aria-label="Bildirimler">🔔</button>
+
     <div class="nav-status">
-      <span class="status-dot"></span>
-      <span class="status-label">LIVE</span>
+      <span class="status-dot" id="sse-status-dot"></span>
+      <span class="status-label" id="sse-status-label">CANLI</span>
     </div>
+
   </nav>
 
+  <!-- ── Org Sub-Navigation ─────────────────────────────── -->
+  {% if page in ['org', 'org_departments', 'org_employees', 'org_roles', 'org_skills'] %}
+  <nav class="subnav">
+    <a href="/org"              class="subnav-link {% if page == 'org'              %}subnav-active{% endif %}">Ağaç Görünümü</a>
+    <a href="/org/departments"  class="subnav-link {% if page == 'org_departments'  %}subnav-active{% endif %}">Departmanlar</a>
+    <a href="/org/employees"    class="subnav-link {% if page == 'org_employees'    %}subnav-active{% endif %}">Çalışanlar</a>
+    <a href="/org/roles"        class="subnav-link {% if page == 'org_roles'        %}subnav-active{% endif %}">Roller</a>
+    <a href="/org/skills"       class="subnav-link {% if page == 'org_skills'       %}subnav-active{% endif %}">Yetenekler</a>
+  </nav>
+  {% endif %}
+
+  <!-- ── Collab Sub-Navigation ────────────────────────────── -->
+  {% if page in ['collab', 'collab_conversations', 'collab_sessions', 'collab_policies'] %}
+  <nav class="subnav">
+    <a href="/collab"               class="subnav-link {% if page == 'collab'               %}subnav-active{% endif %}">Merkez</a>
+    <a href="/collab/conversations" class="subnav-link {% if page == 'collab_conversations' %}subnav-active{% endif %}">Konusmalar</a>
+    <a href="/collab/sessions"      class="subnav-link {% if page == 'collab_sessions'      %}subnav-active{% endif %}">Oturumlar</a>
+    <a href="/collab/policies"      class="subnav-link {% if page == 'collab_policies'      %}subnav-active{% endif %}">Politikalar</a>
+  </nav>
+  {% endif %}
+
+  <!-- ── Page Content ─────────────────────────────────────── -->
   <main class="main-content">
     {% block content %}{% endblock %}
   </main>
 
+  <!-- ── Footer ───────────────────────────────────────────── -->
   <footer class="footer">
-    <span>AI Company OS &mdash; Sprint 15 CEO Control Center</span>
-    <span class="footer-right">Read-Only Dashboard &mdash; Real Data</span>
+    <span>AI Company OS &mdash; Sprint 19 Canlı Operasyon Merkezi</span>
+    <span class="footer-right">Canlı Veri &mdash; Gerçek Motorlar</span>
   </footer>
 
+  <!-- ── Toast Container ──────────────────────────────────── -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
   <script src="/static/app.js"></script>
+  <!-- SSE live event stream — updates counters and timeline without reload -->
+  <div id="sse-event-buffer" style="display:none"></div>
 </body>
 </html>

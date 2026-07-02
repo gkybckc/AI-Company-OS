@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, empty_state, filter_bar %}
+{% block title %}Is Birligi Merkezi{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Is Birligi Merkezi</h1>
+    <p class="page-subtitle">Cok ajanlı konusmalar, oturumlar ve politikalar</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openNewConvModal()">+ Yeni Konusma</button>
+  </div>
+</div>
+
+<!-- ── KPI ──────────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_conversations,       "Toplam Konusma",   "◎", counter=false) }}
+  {{ kpi_card(stats.active_conversations,      "Aktif",            "●", counter=false) }}
+  {{ kpi_card(stats.pending_review_conversations, "Inceleme Bekliyor", "‖", counter=false) }}
+  {{ kpi_card(stats.total_messages,            "Toplam Mesaj",     "✉", counter=false) }}
+</div>
+
+<!-- ── Active Conversations ─────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Aktif Konusmalar</h2>
+    <span class="meta-text">{{ active_conversations | length }} konusma</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if active_conversations %}
+    <table class="org-table">
+      <thead>
+        <tr>
+          <th>Baslik</th>
+          <th>Katilimcilar</th>
+          <th>Mesaj Sayisi</th>
+          <th>Son Guncelleme</th>
+          <th>Durum</th>
+          <th>Islemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for conv in active_conversations %}
+        <tr>
+          <td>
+            <a href="/collab/conversations" class="list-item-title" style="text-decoration:none;color:inherit">
+              {{ conv.title }}
+            </a>
+            {% if conv.template_type %}
+            <span class="org-skill-pill" style="margin-left:.5rem;font-size:10px">{{ conv.template_type | replace('_',' ') | title }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:.25rem;flex-wrap:wrap">
+              {% for p in conv.participants %}
+              <span class="collab-avatar" title="{{ p.name }} — {{ p.role }}">{{ p.initials() }}</span>
+              {% endfor %}
+              {% if not conv.participants %}
+              <span class="meta-text">—</span>
+              {% endif %}
+            </div>
+          </td>
+          <td><span class="badge">{{ conv.message_count() }}</span></td>
+          <td><span class="meta-text" style="font-size:11px">{{ conv.updated_at.strftime('%d/%m %H:%M') }}</span></td>
+          <td><span class="badge status-badge-active">Aktif</span></td>
+          <td>
+            <div class="org-actions">
+              <button class="btn-secondary btn-sm" onclick="openConvDetail('{{ conv.id }}')">Goruntule</button>
+              <button class="btn-secondary btn-sm" onclick="requestReview('{{ conv.id }}')">Incelemeye Al</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="padding:var(--sp-5)">
+        {{ empty_state("Aktif konusma yok. + Yeni Konusma butonuyla baslatın.", "◎") }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Pending Review ────────────────────────────────────────────── -->
+{% if pending_review %}
+<div class="card">
+  <div class="card-header">
+    <h2>Inceleme Bekleyenler</h2>
+    <span class="meta-text">{{ pending_review | length }} bekliyor</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <table class="org-table">
+      <thead><tr><th>Baslik</th><th>Mesaj</th><th>Ozet</th><th>Islemler</th></tr></thead>
+      <tbody>
+        {% for conv in pending_review %}
+        <tr>
+          <td><strong>{{ conv.title }}</strong></td>
+          <td><span class="badge">{{ conv.message_count() }}</span></td>
+          <td>
+            {% if conv.summary %}
+            <span class="meta-text" style="font-size:11px">{{ conv.summary.executive_summary[:80] }}…</span>
+            {% else %}
+            <span class="meta-text">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="org-actions">
+              <button class="btn-secondary btn-sm" onclick="approveConv('{{ conv.id }}')">Onayla</button>
+              <button class="btn-secondary btn-sm" onclick="closeConv('{{ conv.id }}')">Kapat</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Sessions Overview ─────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Aktif Oturumlar</h2>
+    <span class="meta-text">{{ stats.total_sessions }} oturum</span>
+  </div>
+  <div class="card-body">
+    <div class="agent-cards">
+      {% for session in sessions %}
+      <div class="agent-card">
+        <div class="agent-card-name">{{ session.title }}</div>
+        <div class="agent-card-role meta-text">{{ session.conversation_count() }} konusma</div>
+        <div class="agent-card-status">
+          <span class="badge status-badge-{{ session.status.value }}">{{ session.status.label() }}</span>
+        </div>
+      </div>
+      {% else %}
+      <p class="meta-text">Henuz oturum yok.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Message Category Stats ───────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Mesaj Dagilimi</h2>
+  </div>
+  <div class="card-body">
+    <div class="agent-cards">
+      {% for cat, count in stats.messages_by_category.items() %}
+      {% if count > 0 %}
+      <div class="agent-card" style="min-width:120px">
+        <div class="agent-card-name">{{ count }}</div>
+        <div class="agent-card-role meta-text">{{ cat | replace('_',' ') | title }}</div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── New Conversation Modal ───────────────────────────────────── -->
+<div class="org-modal-overlay" id="new-conv-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeNewConvModal()">x</button>
+    <div class="org-modal-title">Yeni Konusma</div>
+    <form id="new-conv-form" onsubmit="submitNewConvForm(event)">
+      <div class="form-row">
+        <label for="conv-title">Baslik</label>
+        <input type="text" id="conv-title" placeholder="Konusma konusu…" required />
+      </div>
+      <div class="form-row">
+        <label for="conv-template">Sablon (opsiyonel)</label>
+        <select id="conv-template">
+          <option value="">— Sablon secin —</option>
+          {% for tmpl in templates %}
+          <option value="{{ tmpl.template_type }}">{{ tmpl.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="conv-creator">Olusturan ID</label>
+        <input type="text" id="conv-creator" value="ceo" required />
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeNewConvModal()">Iptal</button>
+        <button type="submit" class="btn-primary">Olustur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Conversation Detail Modal ────────────────────────────────── -->
+<div class="org-modal-overlay" id="conv-detail-modal">
+  <div class="org-modal" role="dialog" aria-modal="true" style="max-width:640px">
+    <button class="org-modal-close" onclick="closeConvDetailModal()">x</button>
+    <div class="org-modal-title" id="conv-detail-title">Konusma Detayi</div>
+    <div id="conv-detail-body" style="max-height:420px;overflow-y:auto">
+      <p class="meta-text">Yukleniyor…</p>
+    </div>
+    <div class="org-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeConvDetailModal()">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.collab-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: default;
+  user-select: none;
+}
+.chat-bubble {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 8px;
+  margin-bottom: var(--sp-2);
+  max-width: 90%;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.bubble-question    { background: #1e3a5f; border-left: 3px solid #3b82f6; }
+.bubble-answer      { background: #1a3a2a; border-left: 3px solid #22c55e; }
+.bubble-proposal    { background: #2d1b4e; border-left: 3px solid #a855f7; }
+.bubble-review      { background: #1c2f3f; border-left: 3px solid #06b6d4; }
+.bubble-approval    { background: #2e2214; border-left: 3px solid #f59e0b; }
+.bubble-warning     { background: #2e2214; border-left: 3px solid #f97316; }
+.bubble-risk        { background: #3a1a1a; border-left: 3px solid #ef4444; }
+.bubble-decision    { background: #162416; border-left: 3px solid #84cc16; }
+.bubble-default     { background: var(--gray-800); }
+.chat-meta          { font-size: 10px; color: var(--gray-400); margin-bottom: 2px; }
+</style>
+
+<script>
+(function(){
+  window.openNewConvModal  = function(){ document.getElementById('new-conv-modal').classList.add('open'); };
+  window.closeNewConvModal = function(){ document.getElementById('new-conv-modal').classList.remove('open'); };
+
+  window.submitNewConvForm = function(e){
+    e.preventDefault();
+    fetch('/api/collab/conversations', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        title: document.getElementById('conv-title').value,
+        template_type: document.getElementById('conv-template').value,
+        creator: document.getElementById('conv-creator').value,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Basarili','Konusma olusturuldu.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error||'Hata.','error'); }
+    });
+  };
+
+  window.openConvDetail = function(id){
+    document.getElementById('conv-detail-modal').classList.add('open');
+    fetch('/api/collab/conversations/'+id)
+    .then(function(r){ return r.json(); })
+    .then(function(conv){
+      document.getElementById('conv-detail-title').textContent = conv.title;
+      var html = '';
+      (conv.messages||[]).forEach(function(m){
+        html += '<div class="chat-bubble '+m.css_class+'">'
+              + '<div class="chat-meta">'+m.sender+' · '+m.category_label+'</div>'
+              + m.content
+              + '</div>';
+      });
+      if(!html) html = '<p class="meta-text">Henuz mesaj yok.</p>';
+      document.getElementById('conv-detail-body').innerHTML = html;
+    });
+  };
+  window.closeConvDetailModal = function(){ document.getElementById('conv-detail-modal').classList.remove('open'); };
+
+  window.requestReview = function(id){
+    fetch('/api/collab/conversations/'+id+'/request-review',{method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Bilgi','Incelemeye alindi.','info'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+
+  window.approveConv = function(id){
+    fetch('/api/collab/conversations/'+id+'/approve',{method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Basarili','Onaylandi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+
+  window.closeConv = function(id){
+    fetch('/api/collab/conversations/'+id+'/close',{method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Bilgi','Konusma kapatildi.','info'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+})();
+</script>
+
+{% endblock %}

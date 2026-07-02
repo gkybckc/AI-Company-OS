@@ -315,27 +315,27 @@ class TestHTMLPageContents(unittest.TestCase):
 
     def test_dashboard_has_projects_kpi(self):
         r = self.client.get("/")
-        self.assertIn("Projects", r.text)
+        self.assertIn("Projeler", r.text)
 
     def test_dashboard_has_employees_kpi(self):
         r = self.client.get("/")
-        self.assertIn("Employees", r.text)
+        self.assertIn("aktif", r.text.lower())
 
     def test_dashboard_has_departments(self):
         r = self.client.get("/")
-        self.assertIn("Departments", r.text)
+        self.assertIn("Departmanlar", r.text)
 
     def test_dashboard_has_event_timeline(self):
         r = self.client.get("/")
-        self.assertIn("Event Timeline", r.text)
+        self.assertIn("Olay", r.text)
 
     def test_dashboard_has_recent_decisions(self):
         r = self.client.get("/")
-        self.assertIn("Recent Decisions", r.text)
+        self.assertIn("Son Kararlar", r.text)
 
     def test_dashboard_has_recent_memory(self):
         r = self.client.get("/")
-        self.assertIn("Recent Memory", r.text)
+        self.assertIn("Hafıza", r.text)
 
     def test_projects_page_has_project_title(self):
         r = self.client.get("/projects")
@@ -343,11 +343,11 @@ class TestHTMLPageContents(unittest.TestCase):
 
     def test_projects_page_has_tasks_section(self):
         r = self.client.get("/projects")
-        self.assertIn("Tasks", r.text)
+        self.assertIn("Görevler", r.text)
 
     def test_projects_page_shows_progress(self):
         r = self.client.get("/projects")
-        self.assertIn("Progress", r.text)
+        self.assertIn("İlerleme", r.text)
 
     def test_employees_page_has_table(self):
         r = self.client.get("/employees")
@@ -359,7 +359,7 @@ class TestHTMLPageContents(unittest.TestCase):
 
     def test_employees_page_has_department_section(self):
         r = self.client.get("/employees")
-        self.assertIn("Departments", r.text)
+        self.assertIn("Departmanlar", r.text)
 
     def test_workflow_page_has_stages(self):
         r = self.client.get("/workflow")
@@ -367,15 +367,15 @@ class TestHTMLPageContents(unittest.TestCase):
 
     def test_workflow_page_has_progress(self):
         r = self.client.get("/workflow")
-        self.assertIn("Progress", r.text)
+        self.assertIn("İlerleme", r.text)
 
     def test_events_page_has_channel_stats(self):
         r = self.client.get("/events")
-        self.assertIn("Channel Statistics", r.text)
+        self.assertIn("Kanal", r.text)
 
     def test_events_page_has_timeline(self):
         r = self.client.get("/events")
-        self.assertIn("Event Timeline", r.text)
+        self.assertIn("Zaman", r.text)
 
     def test_events_page_has_htmx_polling(self):
         r = self.client.get("/events")
@@ -1103,7 +1103,7 @@ class TestHTMXPolling(unittest.TestCase):
 
     def test_dashboard_polling_target(self):
         r = self.client.get("/")
-        self.assertIn("/api/events/recent", r.text)
+        self.assertIn("/api/timeline", r.text)
 
     def test_events_page_has_hx_get(self):
         r = self.client.get("/events")
@@ -1111,7 +1111,7 @@ class TestHTMXPolling(unittest.TestCase):
 
     def test_events_page_polling_target(self):
         r = self.client.get("/events")
-        self.assertIn("/api/events/recent", r.text)
+        self.assertIn("/api/timeline", r.text)
 
     def test_events_page_has_hx_trigger(self):
         r = self.client.get("/events")
@@ -1119,7 +1119,7 @@ class TestHTMXPolling(unittest.TestCase):
 
     def test_events_page_has_every_trigger(self):
         r = self.client.get("/events")
-        self.assertIn("every 5s", r.text)
+        self.assertIn("every 3s", r.text)
 
     def test_dashboard_has_hx_swap(self):
         r = self.client.get("/")
@@ -1358,11 +1358,11 @@ class TestWorkflowPageContent(unittest.TestCase):
 
     def test_workflow_page_has_total_workflows(self):
         r = self.client.get("/workflow")
-        self.assertIn("Total Workflows", r.text)
+        self.assertIn("Toplam", r.text)
 
     def test_workflow_page_has_status_labels(self):
         r = self.client.get("/workflow")
-        self.assertIn("Active", r.text)
+        self.assertIn("Aktif", r.text)
 
     def test_workflow_page_shows_workflow_name(self):
         r = self.client.get("/workflow")
@@ -1399,11 +1399,11 @@ class TestEventsPageContent(unittest.TestCase):
 
     def test_events_page_has_total_events(self):
         r = self.client.get("/events")
-        self.assertIn("Total Events", r.text)
+        self.assertIn("Toplam Olay", r.text)
 
     def test_events_page_has_subscriber_info(self):
         r = self.client.get("/events")
-        self.assertIn("Subscribers", r.text)
+        self.assertIn("Aboneler", r.text)
 
     def test_events_page_has_event_channels(self):
         r = self.client.get("/events")
@@ -1419,7 +1419,7 @@ class TestEventsPageContent(unittest.TestCase):
 
     def test_events_page_has_event_timeline_section(self):
         r = self.client.get("/events")
-        self.assertIn("Event Timeline", r.text)
+        self.assertIn("Olay Zaman", r.text)
 
 
 # ===========================================================================
@@ -1543,7 +1543,7 @@ class TestDashboardCompanyInfo(unittest.TestCase):
 
     def test_footer_on_dashboard(self):
         r = self.client.get("/")
-        self.assertIn("Sprint 15", r.text)
+        self.assertIn("Sprint 19", r.text)
 
 
 if __name__ == "__main__":

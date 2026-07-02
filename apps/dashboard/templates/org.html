@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import progress_bar, empty_state %}
+{% block title %}Organizasyon{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Şirket Organizasyonu</h1>
+    <p class="page-subtitle">{{ company_name }} &mdash; {{ total_departments }} departman, {{ total_employees }} çalışan</p>
+  </div>
+</div>
+
+<!-- ── Organizasyon Ağacı ────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Organizasyon Ağacı</h2>
+  </div>
+  <div class="card-body">
+    <div class="org-tree">
+
+      <!-- CEO Seviyesi -->
+      <div class="org-level org-level-ceo">
+        <div class="org-node org-node-ceo">
+          <div class="org-node-title">CEO</div>
+          <div class="org-node-desc">Yönetici &mdash; Tüm kararların sahibi</div>
+        </div>
+      </div>
+
+      <div class="org-connector-v"></div>
+
+      <!-- Yönetici Motoru -->
+      <div class="org-level org-level-exec">
+        <div class="org-node org-node-exec">
+          <div class="org-node-title">Yönetici Motoru</div>
+          <div class="org-node-desc">Koordinasyon &amp; Orchestration</div>
+        </div>
+      </div>
+
+      <div class="org-connector-v"></div>
+
+      <!-- Departmanlar -->
+      <div class="org-level org-level-depts">
+        {% for entry in org_data %}
+        <div class="org-dept-column">
+          <div class="org-node org-node-dept">
+            <div class="org-node-title">{{ entry.department.name }}</div>
+            <div class="org-node-desc">
+              <span class="badge badge-status-{{ entry.department.status.value | lower }}">{{ entry.department.status.value }}</span>
+              &nbsp;{{ (entry.department.workload * 100) | round(0) | int }}%
+            </div>
+          </div>
+
+          {% if entry.department.director %}
+          <div class="org-connector-v-sm"></div>
+          <div class="org-node org-node-director">
+            <div class="org-node-title">{{ entry.department.director.name }}</div>
+            <div class="org-node-desc">Direktör</div>
+          </div>
+          {% endif %}
+
+          {% if entry.employees %}
+          <div class="org-connector-v-sm"></div>
+          <div class="org-employees">
+            {% for emp in entry.employees %}
+            <div class="org-node org-node-emp">
+              <div class="org-emp-name">{{ emp.name }}</div>
+              <div class="org-emp-role">{{ emp.role.value }}</div>
+              <div class="org-emp-badges">
+                <span class="badge badge-seniority-{{ emp.seniority.value | lower }}">{{ emp.seniority.value }}</span>
+                <span class="badge badge-status-{{ emp.status.value | lower }}">{{ emp.status.value }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="org-connector-v-sm"></div>
+          <div class="org-empty-dept"><span class="meta-text">Henüz çalışan yok</span></div>
+          {% endif %}
+
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Departman Özet Tablosu ────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Departman Özeti</h2>
+  </div>
+  <div class="card-body" style="padding:0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Departman</th>
+          <th>Direktör</th>
+          <th>Çalışan</th>
+          <th>Durum</th>
+          <th>İş Yükü</th>
+          <th>Kapasite</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in org_data %}
+        <tr>
+          <td class="td-name">{{ entry.department.name }}</td>
+          <td>{{ entry.department.director.name if entry.department.director else '—' }}</td>
+          <td>{{ entry.employees | length }}</td>
+          <td>
+            <span class="badge badge-status-{{ entry.department.status.value | lower }}">
+              {{ entry.department.status.value }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex; align-items:center; gap:.5rem;">
+              <span class="meta-text" style="flex-shrink:0; width:32px; text-align:right;">
+                {{ (entry.department.workload * 100) | round(0) | int }}%
+              </span>
+              <div class="progress-bar" style="width:80px; flex-shrink:0">
+                <div class="progress-fill progress-fill-animated"
+                     style="width:{{ (entry.department.workload * 100) | round(0) | int }}%"></div>
+              </div>
+            </div>
+          </td>
+          <td class="meta-text">{{ entry.department.capacity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

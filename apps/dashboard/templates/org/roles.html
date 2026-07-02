@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, empty_state, filter_bar %}
+{% block title %}Roller{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Rol Yönetimi</h1>
+    <p class="page-subtitle">Organizasyondaki rolleri tanımlayın ve yönetin</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openNewRoleModal()">+ Yeni Rol</button>
+  </div>
+</div>
+
+<!-- ── KPI ───────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_roles,     "Toplam Rol",    "◈", counter=false) }}
+  {{ kpi_card(stats.total_employees, "Toplam Çalışan","◎", counter=false) }}
+</div>
+
+<!-- ── Search ────────────────────────────────────────────────── -->
+{{ filter_bar("Rol ara…", "role-search") }}
+
+<!-- ── Roles Table ───────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Roller</h2>
+    <span class="meta-text">{{ role_data | length }} rol</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if role_data %}
+    <table class="org-table" id="roles-table">
+      <thead>
+        <tr>
+          <th>Rol Adı</th>
+          <th>Açıklama</th>
+          <th>Çalışan Sayısı</th>
+          <th>İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in role_data %}
+        {% set role = item.role %}
+        <tr class="role-row" data-name="{{ role.name | lower }}">
+          <td><strong>{{ role.name }}</strong></td>
+          <td><span class="meta-text">{{ role.description or '—' }}</span></td>
+          <td><span class="badge">{{ item.employee_count }}</span></td>
+          <td>
+            <div class="org-actions">
+              <button class="btn-secondary btn-sm"
+                onclick="openEditRoleModal('{{ role.id }}','{{ role.name }}','{{ role.description }}')">
+                Düzenle
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div style="padding:var(--sp-5)">
+        {{ empty_state("Henüz rol yok. + Yeni Rol butonuyla ekleyin.", "◈") }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── New Role Modal ────────────────────────────────────────── -->
+<div class="org-modal-overlay" id="new-role-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeNewRoleModal()">✕</button>
+    <div class="org-modal-title">Yeni Rol Ekle</div>
+    <form id="new-role-form" onsubmit="submitNewRoleForm(event)">
+      <div class="form-row">
+        <label for="new-role-name">Rol Adı</label>
+        <input type="text" id="new-role-name" placeholder="Örn: Unity Engineer" required />
+      </div>
+      <div class="form-row">
+        <label for="new-role-desc">Açıklama (opsiyonel)</label>
+        <textarea id="new-role-desc" rows="2" placeholder="Rolün kapsamı ve sorumlulukları…"></textarea>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeNewRoleModal()">İptal</button>
+        <button type="submit" class="btn-primary">Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Edit Role Modal ───────────────────────────────────────── -->
+<div class="org-modal-overlay" id="edit-role-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeEditRoleModal()">✕</button>
+    <div class="org-modal-title">Rol Düzenle</div>
+    <form id="edit-role-form" onsubmit="submitEditRoleForm(event)">
+      <input type="hidden" id="edit-role-id" />
+      <div class="form-row">
+        <label for="edit-role-name">Rol Adı</label>
+        <input type="text" id="edit-role-name" required />
+      </div>
+      <div class="form-row">
+        <label for="edit-role-desc">Açıklama</label>
+        <textarea id="edit-role-desc" rows="2"></textarea>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeEditRoleModal()">İptal</button>
+        <button type="submit" class="btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  var inp = document.getElementById('role-search');
+  if(inp) inp.addEventListener('input', function(){
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('.role-row').forEach(function(r){
+      r.style.display = r.dataset.name.includes(q) ? '' : 'none';
+    });
+  });
+
+  window.openNewRoleModal  = function(){ document.getElementById('new-role-modal').classList.add('open'); };
+  window.closeNewRoleModal = function(){ document.getElementById('new-role-modal').classList.remove('open'); };
+  window.submitNewRoleForm = function(e){
+    e.preventDefault();
+    fetch('/api/org/roles', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('new-role-name').value,
+        description: document.getElementById('new-role-desc').value,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Rol oluşturuldu.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+
+  window.openEditRoleModal = function(id, name, desc){
+    document.getElementById('edit-role-id').value = id;
+    document.getElementById('edit-role-name').value = name;
+    document.getElementById('edit-role-desc').value = desc;
+    document.getElementById('edit-role-modal').classList.add('open');
+  };
+  window.closeEditRoleModal = function(){ document.getElementById('edit-role-modal').classList.remove('open'); };
+  window.submitEditRoleForm = function(e){
+    e.preventDefault();
+    var id = document.getElementById('edit-role-id').value;
+    fetch('/api/org/roles/'+id, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('edit-role-name').value,
+        description: document.getElementById('edit-role-desc').value,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Başarılı','Rol güncellendi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata', d.error || 'Hata.', 'error'); }
+    });
+  };
+})();
+</script>
+
+{% endblock %}

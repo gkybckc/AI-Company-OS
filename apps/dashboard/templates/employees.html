@@ -1,66 +1,86 @@
 {% extends "base.html" %}
-{% block title %}Employees{% endblock %}
+{% from "partials/macros.html" import progress_bar, empty_state, filter_bar %}
+{% block title %}Çalışanlar{% endblock %}
 
 {% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
 <div class="page-header">
-  <h1>Employees</h1>
-  <p class="page-subtitle">{{ total_employees }} total &mdash; {{ active_employees }} active</p>
+  <div class="page-header-left">
+    <h1>Çalışanlar</h1>
+    <p class="page-subtitle">Toplam {{ total_employees }} &mdash; {{ active_employees }} aktif</p>
+  </div>
 </div>
 
-<!-- Department Summary -->
-<div class="card">
-  <div class="card-header">
-    <h2>Departments</h2>
-  </div>
+<!-- ── Departman Kartları ────────────────────────────────────── -->
+<div class="card" style="margin-bottom:1.5rem">
+  <div class="card-header"><h2>Departmanlar</h2></div>
   <div class="card-body">
-    <div class="dept-grid">
-      {% for dept in departments %}
-      <div class="dept-card">
-        <div class="dept-name">{{ dept.name }}</div>
-        <div class="dept-status">
-          <span class="badge badge-status-{{ dept.status.value | lower }}">{{ dept.status.value }}</span>
-        </div>
-        <div class="dept-capacity">
-          Capacity: {{ dept.capacity }}
-          &bull; Workload: {{ (dept.workload * 100) | round(0) | int }}%
-        </div>
-        {% if dept.director %}
-        <div class="dept-director">Director: {{ dept.director.name }}</div>
-        {% endif %}
-      </div>
-      {% endfor %}
+<div class="dept-grid">
+  {% for dept in departments %}
+  <div class="dept-card">
+    <div class="dept-name">{{ dept.name }}</div>
+    <div class="dept-status">
+      <span class="badge badge-status-{{ dept.status.value | lower }}">{{ dept.status.value }}</span>
     </div>
+    <div class="dept-capacity meta-text">Kapasite: {{ dept.capacity }} &bull; İş Yükü: {{ (dept.workload * 100) | round(0) | int }}%</div>
+    {% if dept.director %}
+    <div class="dept-director">Direktör: {{ dept.director.name }}</div>
+    {% endif %}
+    {{ progress_bar((dept.workload * 100) | round(0) | int) }}
+  </div>
+  {% endfor %}
+</div>
   </div>
 </div>
 
-<!-- Employee Table -->
+<!-- ── Search ────────────────────────────────────────────────── -->
+{{ filter_bar("Çalışan ara…", "emp-search") }}
+
+<!-- ── Departmana Göre Tablolar ──────────────────────────────── -->
+{% for dept in departments %}
+{% set dept_employees = employees | selectattr("department.value", "equalto", dept.type.value) | list %}
+{% if dept_employees %}
 <div class="card">
   <div class="card-header">
-    <h2>All Employees</h2>
+    <h2>{{ dept.name }}</h2>
+    <span class="meta-text">{{ dept_employees | length }} çalışan &bull; {{ (dept.workload * 100) | round(0) | int }}%</span>
   </div>
-  <div class="card-body">
+  <div class="card-body" style="padding:0">
     <table class="data-table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Role</th>
-          <th>Department</th>
-          <th>Seniority</th>
-          <th>Status</th>
-          <th>Skills</th>
+          <th>Ad</th>
+          <th>Rol</th>
+          <th>Kıdem</th>
+          <th>Durum</th>
+          <th>İş Yükü</th>
+          <th>Beceriler</th>
         </tr>
       </thead>
       <tbody>
-        {% for emp in employees %}
-        <tr>
+        {% for emp in dept_employees %}
+        <tr class="employee-row"
+            data-emp-id="{{ emp.id }}"
+            data-emp-name="{{ emp.name }}"
+            data-emp-role="{{ emp.role.value }}"
+            data-emp-dept="{{ emp.department.value }}"
+            data-emp-seniority="{{ emp.seniority.value }}"
+            data-emp-status="{{ emp.status.value }}"
+            data-emp-skills="{{ emp.skills | join(', ') }}"
+            style="cursor:pointer"
+            title="Detaylar için tıkla">
           <td class="td-name">{{ emp.name }}</td>
-          <td>{{ emp.role.value }}</td>
-          <td>{{ dept_map.get(emp.department.value, emp.department.value) }}</td>
+          <td class="meta-text">{{ emp.role.value }}</td>
+          <td><span class="badge badge-seniority-{{ emp.seniority.value | lower }}">{{ emp.seniority.value }}</span></td>
+          <td><span class="badge badge-status-{{ emp.status.value | lower }}">{{ emp.status.value }}</span></td>
           <td>
-            <span class="badge badge-seniority-{{ emp.seniority.value | lower }}">{{ emp.seniority.value }}</span>
-          </td>
-          <td>
-            <span class="badge badge-status-{{ emp.status.value | lower }}">{{ emp.status.value }}</span>
+            <div class="emp-workload">
+              <span class="meta-text">{{ (dept.workload * 100) | round(0) | int }}%</span>
+              <div class="progress-bar" style="width:72px; flex-shrink:0">
+                <div class="progress-fill progress-fill-animated" style="width:{{ (dept.workload * 100) | round(0) | int }}%"></div>
+              </div>
+            </div>
           </td>
           <td>
             {% for skill in emp.skills %}
@@ -73,4 +93,117 @@
     </table>
   </div>
 </div>
+{% endif %}
+{% endfor %}
+
+<!-- ── Atanmamış Çalışanlar ──────────────────────────────────── -->
+{% set unassigned = employees | selectattr("department.value", "equalto", "NONE") | list %}
+{% if unassigned %}
+<div class="card">
+  <div class="card-header">
+    <h2>Atanmamış Çalışanlar</h2>
+    <span class="meta-text">{{ unassigned | length }} çalışan</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Ad</th><th>Rol</th><th>Kıdem</th><th>Durum</th><th>Beceriler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in unassigned %}
+        <tr>
+          <td class="td-name">{{ emp.name }}</td>
+          <td class="meta-text">{{ emp.role.value }}</td>
+          <td><span class="badge badge-seniority-{{ emp.seniority.value | lower }}">{{ emp.seniority.value }}</span></td>
+          <td><span class="badge badge-status-{{ emp.status.value | lower }}">{{ emp.status.value }}</span></td>
+          <td>{% for skill in emp.skills %}<span class="skill-tag">{{ skill }}</span>{% endfor %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Tüm Çalışanlar ────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2>Tüm Çalışanlar</h2>
+    <span class="meta-text">{{ employees | length }} toplam</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Ad</th><th>Rol</th><th>Departman</th><th>Kıdem</th><th>Durum</th><th>Beceriler</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+        <tr class="employee-row"
+            data-emp-id="{{ emp.id }}"
+            data-emp-name="{{ emp.name }}"
+            data-emp-role="{{ emp.role.value }}"
+            data-emp-dept="{{ emp.department.value }}"
+            data-emp-seniority="{{ emp.seniority.value }}"
+            data-emp-status="{{ emp.status.value }}"
+            data-emp-skills="{{ emp.skills | join(', ') }}"
+            style="cursor:pointer"
+            title="Detaylar için tıkla">
+          <td class="td-name">{{ emp.name }}</td>
+          <td class="meta-text">{{ emp.role.value }}</td>
+          <td class="meta-text">{{ dept_map.get(emp.department.value, emp.department.value) }}</td>
+          <td><span class="badge badge-seniority-{{ emp.seniority.value | lower }}">{{ emp.seniority.value }}</span></td>
+          <td><span class="badge badge-status-{{ emp.status.value | lower }}">{{ emp.status.value }}</span></td>
+          <td>{% for skill in emp.skills %}<span class="skill-tag">{{ skill }}</span>{% endfor %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Çalışan Detay Drawer ──────────────────────────────────── -->
+<div id="emp-drawer-overlay" class="drawer-overlay" style="display:none" onclick="closeEmpDrawer()"></div>
+<div id="emp-drawer" class="drawer" style="display:none; flex-direction:column">
+  <div class="drawer-header">
+    <h2 id="drawer-emp-name">Çalışan Detayları</h2>
+    <button class="drawer-close" onclick="closeEmpDrawer()" aria-label="Kapat">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-emp-body">
+    <div class="field-row">
+      <span class="field-label">Rol</span>
+      <span class="field-value" id="drawer-emp-role"></span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Departman</span>
+      <span class="field-value" id="drawer-emp-dept"></span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Kıdem</span>
+      <span class="field-value" id="drawer-emp-seniority"></span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Durum</span>
+      <span class="field-value" id="drawer-emp-status"></span>
+    </div>
+    <div style="padding:var(--sp-3) 0; border-bottom:1px solid var(--border-subtle);">
+      <span class="field-label" style="display:block; margin-bottom:.4rem">Beceriler</span>
+      <div id="drawer-emp-skills" style="display:flex; flex-wrap:wrap; gap:.3rem"></div>
+    </div>
+    <div id="drawer-current-task" style="margin-top:var(--sp-5); display:none">
+      <div class="section-header" style="margin-bottom:.6rem">
+        <span class="section-title">Mevcut Görev</span>
+      </div>
+      <div class="task-item">
+        <span id="drawer-task-status" class="badge"></span>
+        <span id="drawer-task-title" class="task-title"></span>
+        <span id="drawer-task-priority" class="badge"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

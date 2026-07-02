@@ -1,83 +1,174 @@
 {% extends "base.html" %}
-{% block title %}Projects{% endblock %}
+{% from "partials/macros.html" import progress_bar, empty_state, filter_bar %}
+{% block title %}Projeler{% endblock %}
 
 {% block content %}
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
 <div class="page-header">
-  <h1>Projects</h1>
-  <p class="page-subtitle">{{ total_projects }} total project(s) tracked by the Executive Engine</p>
+  <div class="page-header-left">
+    <h1>Projeler</h1>
+    <p class="page-subtitle">{{ total_projects }} proje &mdash; Yürütme Motoru tarafından takip edilmektedir</p>
+  </div>
 </div>
 
+<!-- ── Search / Filter ──────────────────────────────────────── -->
+{{ filter_bar("Proje ara…", "page-search") }}
+
+<!-- ── Project Cards ────────────────────────────────────────── -->
 {% if project_statuses %}
   {% for ps in project_statuses %}
   <div class="card project-card">
+
     <div class="card-header">
-      <div>
+      <div style="flex:1; min-width:0;">
         <h2>{{ ps.project.title }}</h2>
+        {% if ps.project.description %}
         <p class="card-subtitle">{{ ps.project.description }}</p>
+        {% endif %}
       </div>
       <div class="card-badges">
         <span class="badge badge-{{ ps.project.priority.value | lower }}">{{ ps.project.priority.value }}</span>
         <span class="badge badge-status-{{ ps.project.status.value | lower }}">{{ ps.project.status.value }}</span>
       </div>
     </div>
+
     <div class="card-body">
-      <!-- Objective -->
+
+      <!-- Amaç -->
+      {% if ps.project.objective %}
       <div class="field-row">
-        <span class="field-label">Objective:</span>
+        <span class="field-label">Amaç:</span>
         <span class="field-value">{{ ps.project.objective }}</span>
       </div>
+      {% endif %}
 
-      <!-- Progress -->
-      <div class="field-row">
-        <span class="field-label">Progress:</span>
-        <span class="field-value">{{ ps.status.completion_percentage }}%</span>
-      </div>
-      <div class="progress-bar progress-bar-lg">
-        <div class="progress-fill" style="width: {{ ps.status.completion_percentage }}%"></div>
+      <!-- İlerleme -->
+      <div class="field-row" style="flex-direction:column; gap:.4rem; align-items:flex-start; border:none;">
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+          <span class="field-label">İlerleme:</span>
+          <span class="meta-text">{{ ps.status.completion_percentage }}%</span>
+        </div>
+        {{ progress_bar(ps.status.completion_percentage, animated=true, size="lg") }}
       </div>
 
-      <!-- Stats Row -->
+      <!-- İstatistikler -->
       <div class="stat-row">
         <div class="stat-item">
           <span class="stat-value">{{ ps.status.total_tasks }}</span>
-          <span class="stat-label">Tasks</span>
+          <span class="stat-label">Görev Sayısı</span>
         </div>
         <div class="stat-item">
           <span class="stat-value">{{ ps.status.task_counts.ASSIGNED | default(0) }}</span>
-          <span class="stat-label">Assigned</span>
+          <span class="stat-label">Atanmış</span>
         </div>
         <div class="stat-item">
           <span class="stat-value">{{ ps.status.task_counts.APPROVED | default(0) }}</span>
-          <span class="stat-label">Approved</span>
+          <span class="stat-label">Onaylanmış</span>
         </div>
         <div class="stat-item">
           <span class="stat-value">{{ ps.status.blocked_tasks | length }}</span>
-          <span class="stat-label">Blocked</span>
+          <span class="stat-label">Engellendi</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.artifacts | length }}</span>
+          <span class="stat-label">Çıktı</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.discussions | length }}</span>
+          <span class="stat-label">Tartışma</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ ps.decisions | length }}</span>
+          <span class="stat-label">Karar</span>
         </div>
       </div>
 
-      <!-- Task List -->
-      {% if ps.tasks %}
-      <div class="task-list">
-        <h3>Tasks</h3>
-        {% for task in ps.tasks %}
-        <div class="task-item">
-          <span class="task-status badge badge-task-{{ task.status.value | lower }}">{{ task.status.value }}</span>
-          <span class="task-title">{{ task.title }}</span>
-          <span class="task-agent meta-text">{{ task.assigned_agent or 'Unassigned' }}</span>
-          <span class="badge badge-{{ task.priority.value | lower }}">{{ task.priority.value }}</span>
+      <!-- Genişletilebilir Detaylar -->
+      <details class="project-details">
+        <summary class="project-details-toggle">Detayları Göster / Gizle</summary>
+
+        {% if ps.tasks %}
+        <div class="task-list">
+          <h3>Görevler</h3>
+          {% for task in ps.tasks %}
+          <div class="task-item">
+            <span class="badge badge-task-{{ task.status.value | lower }}">{{ task.status.value }}</span>
+            <span class="task-title">{{ task.title }}</span>
+            <span class="task-agent meta-text">{{ task.assigned_agent or 'Atanmamış' }}</span>
+            <span class="badge badge-{{ task.priority.value | lower }}">{{ task.priority.value }}</span>
+            {% if task.status.value in ('ASSIGNED', 'WORKING') %}
+            <div class="task-progress-bar">
+              <div class="progress-fill progress-fill-animated" style="width:45%"></div>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
-      </div>
-      {% endif %}
+        {% endif %}
+
+        {% if ps.artifacts %}
+        <div class="detail-section">
+          <h3 class="detail-section-title">Üretilen Çıktılar</h3>
+          <div class="artifact-list">
+            {% for artifact in ps.artifacts %}
+            <div class="artifact-item">
+              <div class="artifact-info">
+                <span class="artifact-title">{{ artifact.title }}</span>
+                <span class="badge badge-category-task">{{ artifact.type.value }}</span>
+                <span class="meta-text">v{{ artifact.version }} · {{ artifact.word_count() }} kelime</span>
+              </div>
+              <a href="/api/artifacts/{{ artifact.id }}/download"
+                 class="btn-download"
+                 download="{{ artifact.title }}.md">↓ İndir</a>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if ps.discussions %}
+        <div class="detail-section">
+          <h3 class="detail-section-title">Tartışmalar</h3>
+          {% for disc in ps.discussions %}
+          <div class="list-item">
+            <div class="list-item-title">{{ disc.topic }}</div>
+            <div class="list-item-meta">
+              <span class="badge badge-{{ disc.status.value | lower }}">{{ disc.status.value }}</span>
+              <span class="meta-text">{{ disc.message_count() }} mesaj · {{ disc.participant_count() }} katılımcı</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if ps.decisions %}
+        <div class="detail-section">
+          <h3 class="detail-section-title">Kararlar</h3>
+          {% for dec in ps.decisions %}
+          <div class="list-item">
+            <div class="list-item-title">{{ dec.title }}</div>
+            <div class="list-item-meta">
+              <span class="badge badge-{{ dec.status.value | lower }}">{{ dec.status.value }}</span>
+              {% if dec.recommendation %}
+              <span class="meta-text">→ {{ dec.recommendation }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      </details>
     </div>
   </div>
   {% endfor %}
 {% else %}
   <div class="card">
     <div class="card-body">
-      <p class="empty">No projects found.</p>
+      {{ empty_state("Proje bulunamadı. CEO komutu vererek başlatın.", "◈", "/", "Ana Sayfa") }}
     </div>
   </div>
 {% endif %}
+
 {% endblock %}

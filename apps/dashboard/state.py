@@ -10,6 +10,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from core.artifact_engine import ArtifactEngine
+from core.org_engine import OrgEngine
+from core.collaboration.collaboration_manager import CollaborationHub
+from core.collaboration.conversation_message import MessageCategory, ConversationMessage
+from core.collaboration.conversation_participant import ConversationParticipant
+from core.collaboration.conversation_templates import TemplateType, default_policies
+from core.company_context import CompanyContext
+from core.company_orchestrator import CompanyOrchestrator
 from core.decision_engine import DecisionEngine
 from core.decision_option import DecisionOption
 from core.department import Department
@@ -29,6 +37,7 @@ from core.memory_category import MemoryCategory
 from core.memory_engine import MemoryEngine
 from core.memory_entry import MemoryEntry
 from core.memory_scope import MemoryScope
+from core.planner_engine import PlannerEngine
 from core.project import Project
 from core.stream_channel import StreamChannel
 from core.stream_event import StreamEvent
@@ -62,6 +71,31 @@ class DashboardState:
         )
         self.event_stream = EventStream()
 
+        self.planner_engine = PlannerEngine()
+        self.artifact_engine = ArtifactEngine(
+            executive_engine=self.executive_engine,
+            workflow_engine=self.workflow_engine,
+            memory_engine=self.memory_engine,
+            decision_engine=self.decision_engine,
+            planner_engine=self.planner_engine,
+        )
+        _ctx = CompanyContext(
+            company_id=str(uuid4()),
+            company_name="AI Company OS",
+            executive=self.executive_engine,
+            planner=self.planner_engine,
+            departments=self.department_registry,
+            workforce=self.workforce_registry,
+        )
+        self.orchestrator = CompanyOrchestrator(_ctx)
+        self.orchestrator.start_company()
+        self.last_command: Optional[str] = None
+        self.last_session: Optional[Any] = None
+        self.command_history: List[Dict[str, Any]] = []
+
+        self.org_engine = OrgEngine()
+        self.collab_hub = CollaborationHub(seed_default_policies=True)
+
         self._seed()
 
     # ------------------------------------------------------------------
@@ -83,6 +117,29 @@ class DashboardState:
     # ------------------------------------------------------------------
     # Convenience accessors
     # ------------------------------------------------------------------
+
+    def new_request(self, command: str) -> Any:
+        """Execute a CEO command via the CompanyOrchestrator."""
+        self.last_command = command
+        started_at = datetime.now(timezone.utc)
+        session = self.orchestrator.new_request(command)
+        finished_at = datetime.now(timezone.utc)
+        self.last_session = session
+        self.command_history.append({
+            "command": command,
+            "session_id": session.id,
+            "started_at": started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_seconds": round((finished_at - started_at).total_seconds(), 2),
+            "success": session.is_finished(),
+            "stage": str(session.current_stage),
+            "event_count": session.event_count(),
+        })
+        return session
+
+    def list_artifacts(self) -> List[Any]:
+        """Return all artifacts produced by the ArtifactEngine."""
+        return self.artifact_engine.history()
 
     def list_projects(self) -> List[Project]:
         """Return all projects registered in the Executive Engine."""
@@ -121,6 +178,7 @@ class DashboardState:
         self._seed_decisions()
         self._seed_memory()
         self._seed_events()
+        self._seed_org()
 
     def _seed_departments(self) -> None:
         dept_configs = [
@@ -397,3 +455,137 @@ class DashboardState:
         ]
         for source, channel, payload in events:
             self.event_stream.publish(StreamEvent.create(source, channel, payload))
+
+    def _seed_org(self) -> None:
+        """Seed the OrgEngine with default roles, skills, departments, and employees."""
+        # Roles
+        backend_role = self.org_engine.create_role("Backend Agent", "Server-side development")
+        frontend_role = self.org_engine.create_role("Frontend Agent", "Client-side development")
+        qa_role = self.org_engine.create_role("QA Engineer", "Quality assurance and testing")
+        devops_role = self.org_engine.create_role("DevOps Engineer", "Infrastructure and CI/CD")
+        designer_role = self.org_engine.create_role("UI Designer", "Interface design and UX")
+        researcher_role = self.org_engine.create_role("Research Analyst", "Market and technical research")
+
+        # Skills
+        self.org_engine.create_skill("Python", "Programming")
+        self.org_engine.create_skill("FastAPI", "Framework")
+        self.org_engine.create_skill("PostgreSQL", "Database")
+        self.org_engine.create_skill("React", "Framework")
+        self.org_engine.create_skill("TypeScript", "Programming")
+        self.org_engine.create_skill("CSS", "Styling")
+        self.org_engine.create_skill("Docker", "Infrastructure")
+        self.org_engine.create_skill("CI/CD", "DevOps")
+        self.org_engine.create_skill("Figma", "Design")
+        self.org_engine.create_skill("SEO", "Marketing")
+
+        # Departments
+        backend_dept = self.org_engine.create_department("Backend Engineering", capacity=10)
+        frontend_dept = self.org_engine.create_department("Frontend Engineering", capacity=8)
+        qa_dept = self.org_engine.create_department("Quality Assurance", capacity=6)
+        devops_dept = self.org_engine.create_department("DevOps", capacity=5)
+
+        # Employees
+        alice = self.org_engine.create_employee(
+            "Alice Chen", backend_role.id, backend_dept.id,
+            ["Python", "FastAPI", "PostgreSQL"], "anthropic"
+        )
+        bob = self.org_engine.create_employee(
+            "Bob Kumar", backend_role.id, backend_dept.id,
+            ["Python", "REST API", "SQL"], "anthropic"
+        )
+        carol = self.org_engine.create_employee(
+            "Carol Diaz", frontend_role.id, frontend_dept.id,
+            ["TypeScript", "React", "CSS"], "anthropic"
+        )
+        dave = self.org_engine.create_employee(
+            "Dave Park", qa_role.id, qa_dept.id,
+            ["Test Planning", "Automation", "Regression"], "anthropic"
+        )
+        eve = self.org_engine.create_employee(
+            "Eve Singh", devops_role.id, devops_dept.id,
+            ["Docker", "CI/CD", "Cloud Infrastructure"], "anthropic"
+        )
+
+        # Assign directors
+        self.org_engine.assign_director(backend_dept.id, alice.id)
+        self.org_engine.assign_director(frontend_dept.id, carol.id)
+        self.org_engine.assign_director(qa_dept.id, dave.id)
+        self.org_engine.assign_director(devops_dept.id, eve.id)
+
+        # Assign current tasks (matching existing seeded project tasks)
+        self.org_engine.assign_task(alice.id, "Design Core Architecture")
+        self.org_engine.assign_task(bob.id, "Implement Memory Engine")
+
+        self._seed_collab()
+
+    def _seed_collab(self) -> None:
+        """Seed the CollaborationHub with representative conversations."""
+        hub = self.collab_hub
+
+        # ── Security Review conversation ──────────────────────────────
+        sec_conv = hub.create_from_template(
+            TemplateType.SECURITY_REVIEW,
+            creator="alice",
+            title_override="API Authentication Security Review",
+        )
+        alice_p = ConversationParticipant("alice", "Alice Chen", "Backend Agent", "Backend Engineering")
+        bob_p   = ConversationParticipant("bob",   "Bob Kumar",  "Security",       "Security")
+        dave_p  = ConversationParticipant("dave",  "Dave Park",  "QA Engineer",    "Quality Assurance")
+        hub.join(sec_conv.id, alice_p)
+        hub.join(sec_conv.id, bob_p)
+        hub.join(sec_conv.id, dave_p)
+
+        hub.broadcast(sec_conv.id, "alice", MessageCategory.PROPOSAL,
+                      "Proposing JWT RS256 for API authentication with 24-hour rotation.")
+        hub.broadcast(sec_conv.id, "bob", MessageCategory.REVIEW,
+                      "RS256 approved. Ensure JWKS endpoint is public and tokens are revocable.")
+        hub.broadcast(sec_conv.id, "bob", MessageCategory.WARNING,
+                      "Refresh tokens must be stored server-side, not in localStorage.")
+        hub.broadcast(sec_conv.id, "dave", MessageCategory.REVIEW,
+                      "QA will cover token expiry, rotation edge cases, and revocation paths.")
+        hub.broadcast(sec_conv.id, "alice", MessageCategory.DECISION,
+                      "Adopting JWT RS256 with 24h rotation, server-side refresh token store.")
+        hub.summarize(sec_conv.id)
+
+        # ── Architecture Review conversation ─────────────────────────
+        arch_conv = hub.create_from_template(
+            TemplateType.ARCHITECTURE_REVIEW,
+            creator="alice",
+            title_override="Microservices vs Monolith Architecture Decision",
+        )
+        carol_p = ConversationParticipant("carol", "Carol Diaz", "Frontend Agent", "Frontend Engineering")
+        eve_p   = ConversationParticipant("eve",   "Eve Singh",  "DevOps Engineer","DevOps")
+        hub.join(arch_conv.id, alice_p)
+        hub.join(arch_conv.id, carol_p)
+        hub.join(arch_conv.id, eve_p)
+        hub.join(arch_conv.id, bob_p)
+
+        hub.broadcast(arch_conv.id, "alice", MessageCategory.PROPOSAL,
+                      "Recommend modular monolith for MVP. Decompose to microservices post-PMF.")
+        hub.broadcast(arch_conv.id, "eve",   MessageCategory.REVIEW,
+                      "Monolith reduces DevOps complexity at this stage. Agree with proposal.")
+        hub.broadcast(arch_conv.id, "bob",   MessageCategory.RISK,
+                      "Single deployment unit increases blast radius on security incidents.")
+        hub.broadcast(arch_conv.id, "carol", MessageCategory.QUESTION,
+                      "Will the API gateway still be a separate service?")
+        hub.broadcast(arch_conv.id, "alice", MessageCategory.ANSWER,
+                      "Yes — API gateway stays separate to allow independent scaling.")
+
+        # ── Sprint Planning ───────────────────────────────────────────
+        sprint_conv = hub.create_from_template(
+            TemplateType.SPRINT_PLANNING,
+            creator="exec",
+            title_override="Sprint 22 Planning",
+        )
+        exec_p = ConversationParticipant("exec", "Executive AI", "Executive", "C-Suite")
+        hub.join(sprint_conv.id, exec_p)
+        hub.join(sprint_conv.id, alice_p)
+        hub.join(sprint_conv.id, carol_p)
+        hub.broadcast(sprint_conv.id, "exec",  MessageCategory.PROPOSAL,
+                      "Sprint 22 goal: ship Collaboration Hub dashboard and run regression suite.")
+        hub.broadcast(sprint_conv.id, "alice", MessageCategory.ANSWER,
+                      "Backend capacity: 4 story points. Auth work spills from Sprint 21.")
+        hub.broadcast(sprint_conv.id, "carol", MessageCategory.ANSWER,
+                      "Frontend capacity: 5 story points. No blockers.")
+        hub.broadcast(sprint_conv.id, "exec",  MessageCategory.DECISION,
+                      "Sprint 22 approved. Backend: auth + API. Frontend: collaboration UI.")

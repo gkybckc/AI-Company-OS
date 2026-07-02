@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import kpi_card, empty_state %}
+{% block title %}Oturumlar{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-left">
+    <h1>Oturumlar</h1>
+    <p class="page-subtitle">Proje veya gorev bazinda gruplanmis konusma oturumlari</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary" onclick="openNewSessionModal()">+ Yeni Oturum</button>
+  </div>
+</div>
+
+<!-- ── KPI ──────────────────────────────────────────────────────── -->
+<div class="kpi-row">
+  {{ kpi_card(stats.total_sessions,  "Toplam Oturum", "▦", counter=false) }}
+  {{ kpi_card(stats.open_sessions,   "Acik",          "●", counter=false) }}
+  {{ kpi_card(stats.closed_sessions, "Kapali",        "○", counter=false) }}
+  {{ kpi_card(stats.total_conversations, "Konusma",   "◎", counter=false) }}
+</div>
+
+<!-- ── Sessions Grid ─────────────────────────────────────────────── -->
+{% if sessions %}
+<div class="agent-cards">
+  {% for session in sessions %}
+  <div class="agent-card" style="min-width:260px">
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:var(--sp-2)">
+      <div class="agent-card-name" style="font-size:14px">{{ session.title }}</div>
+      <span class="badge status-badge-{{ session.status.value }}">{{ session.status.label() }}</span>
+    </div>
+
+    {% if session.project_id %}
+    <div class="meta-text" style="font-size:11px;margin-bottom:var(--sp-1)">Proje: {{ session.project_id }}</div>
+    {% endif %}
+    {% if session.task_id %}
+    <div class="meta-text" style="font-size:11px;margin-bottom:var(--sp-1)">Gorev: {{ session.task_id }}</div>
+    {% endif %}
+
+    <div style="margin:var(--sp-2) 0">
+      <span class="badge">{{ session.conversation_count() }} konusma</span>
+    </div>
+
+    {% if session.conversation_ids %}
+    <div style="font-size:11px;color:var(--gray-400);margin-bottom:var(--sp-2)">
+      {% for cid in session.conversation_ids[:3] %}
+      <div style="border-left:2px solid var(--gray-700);padding-left:.5rem;margin-bottom:.25rem">{{ cid[:24] }}…</div>
+      {% endfor %}
+      {% if session.conversation_ids | length > 3 %}
+      <div style="color:var(--gray-500);padding-left:.5rem">+ {{ session.conversation_ids | length - 3 }} daha</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="meta-text" style="font-size:10px">
+      Olusturuldu: {{ session.created_at.strftime('%d/%m/%Y %H:%M') }}
+    </div>
+    {% if session.closed_at %}
+    <div class="meta-text" style="font-size:10px">
+      Kapatildi: {{ session.closed_at.strftime('%d/%m/%Y %H:%M') }}
+    </div>
+    {% endif %}
+
+    {% if session.is_open() %}
+    <div class="org-actions" style="margin-top:var(--sp-3)">
+      <button class="btn-secondary btn-sm" onclick="closeSession('{{ session.id }}')">Oturumu Kapat</button>
+      <button class="btn-secondary btn-sm" onclick="openAddConvModal('{{ session.id }}')">Konusma Ekle</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body">
+    {{ empty_state("Henuz oturum yok. + Yeni Oturum butonuyla baslatin.", "▦") }}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── New Session Modal ─────────────────────────────────────────── -->
+<div class="org-modal-overlay" id="new-session-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeNewSessionModal()">x</button>
+    <div class="org-modal-title">Yeni Oturum</div>
+    <form id="new-session-form" onsubmit="submitNewSession(event)">
+      <div class="form-row">
+        <label>Baslik</label>
+        <input type="text" id="session-title" placeholder="Oturum adi…" required />
+      </div>
+      <div class="form-row">
+        <label>Proje ID (opsiyonel)</label>
+        <input type="text" id="session-project" placeholder="proje-001" />
+      </div>
+      <div class="form-row">
+        <label>Gorev ID (opsiyonel)</label>
+        <input type="text" id="session-task" placeholder="gorev-001" />
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeNewSessionModal()">Iptal</button>
+        <button type="submit" class="btn-primary">Olustur</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Add Conversation to Session Modal ─────────────────────────── -->
+<div class="org-modal-overlay" id="add-conv-modal">
+  <div class="org-modal" role="dialog" aria-modal="true">
+    <button class="org-modal-close" onclick="closeAddConvModal()">x</button>
+    <div class="org-modal-title">Konusma Ekle</div>
+    <form id="add-conv-form" onsubmit="submitAddConv(event)">
+      <input type="hidden" id="target-session-id" />
+      <div class="form-row">
+        <label>Konusma</label>
+        <select id="add-conv-select">
+          {% for conv in all_conversations %}
+          <option value="{{ conv.id }}">{{ conv.title[:48] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="org-modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeAddConvModal()">Iptal</button>
+        <button type="submit" class="btn-primary">Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  window.openNewSessionModal  = function(){ document.getElementById('new-session-modal').classList.add('open'); };
+  window.closeNewSessionModal = function(){ document.getElementById('new-session-modal').classList.remove('open'); };
+
+  window.submitNewSession = function(e){
+    e.preventDefault();
+    fetch('/api/collab/sessions',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        title: document.getElementById('session-title').value,
+        project_id: document.getElementById('session-project').value || null,
+        task_id: document.getElementById('session-task').value || null,
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Basarili','Oturum olusturuldu.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+
+  window.closeSession = function(id){
+    fetch('/api/collab/sessions/'+id+'/close',{method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Bilgi','Oturum kapatildi.','info'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+
+  window.openAddConvModal = function(sessionId){
+    document.getElementById('target-session-id').value = sessionId;
+    document.getElementById('add-conv-modal').classList.add('open');
+  };
+  window.closeAddConvModal = function(){ document.getElementById('add-conv-modal').classList.remove('open'); };
+
+  window.submitAddConv = function(e){
+    e.preventDefault();
+    var sessionId = document.getElementById('target-session-id').value;
+    var convId    = document.getElementById('add-conv-select').value;
+    fetch('/api/collab/sessions/'+sessionId+'/add',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({conversation_id: convId})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d.success){ if(window.showToast) showToast('Basarili','Konusma eklendi.','success'); setTimeout(function(){ location.reload(); },900); }
+      else { if(window.showToast) showToast('Hata',d.error||'Hata.','error'); }
+    });
+  };
+})();
+</script>
+
+{% endblock %}
